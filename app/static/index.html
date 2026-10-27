@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temet nosce</title>
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+</head>
+<body>
+<div class="sky" id="skyA" aria-hidden="true"><canvas></canvas></div><div class="sky off" id="skyB" aria-hidden="true"><canvas></canvas></div>
+<main>
+  <header class="hero">
+    <nav class="seg lang" data-lang-switch aria-label="Language"></nav>
+    <h1 lang="la">Temet nosce</h1>
+    <p data-i18n="hero"></p>
+    <p class="cta-row"><button type="button" class="cta" onclick="startForm()" data-i18n="cta"></button></p>
+    <p class="hero-link"><a href="/about" data-i18n="hero_link"></a></p>
+  </header>
+
+  <div class="card">
+    <h2 data-i18n="your_chart"></h2>
+    <div id="formA"></div>
+    <div class="row">
+      <button onclick="calc()" data-i18n="calc"></button>
+      <button class="ghost" onclick="fcOpen('week')" data-i18n="fc_week"></button>
+      <button class="ghost" onclick="fcOpen('month')" data-i18n="fc_month"></button>
+      <button class="ghost" id="compatBtn" onclick="toggleCompat()" aria-controls="compatCard" aria-expanded="false" data-i18n="compat"></button>
+      <label class="check" id="draftsBox" hidden><input type="checkbox" id="drafts"> <span data-i18n="drafts"></span></label>
+      <span id="status" class="pill" style="display:none"></span>
+    </div>
+  </div>
+
+  <div id="fc"></div>
+  <div id="out"></div>
+
+  <div class="card" id="compatCard" hidden>
+    <div class="card-head"><h2 data-i18n="compat"></h2><button type="button" class="ghost close" onclick="closeCompat()" data-i18n="close"></button></div>
+    <label data-i18n="looking_for"></label>
+    <div class="seg modes" id="pmodes" role="group" data-i18n-attr="aria-label:looking_for"></div>
+    <input type="hidden" id="pmode">
+    <div class="grid" style="margin:14px 0 10px">
+      <div class="span2"><label data-i18n="their_name"></label><input id="bname" data-i18n-attr="placeholder:name_ph"></div>
+    </div>
+    <div id="formB"></div>
+    <div class="row"><button onclick="compare()" data-i18n="compare"></button></div>
+    <div id="pair"></div>
+  </div>
+
+  <footer class="site-foot" data-i18n-html="footer_html"></footer>
+</main>
+<script src="/static/sky.js"></script>
+<script src="/static/wheel.js"></script>
+<script>
+I18N.apply();
+I18N.switcher(document.querySelector("[data-lang-switch]"));
+const LANG = I18N.lang;
+// ссылки на страницу «Как это работает» — на том же языке
+document.querySelectorAll('a[href^="/about"]').forEach(a => { a.href = a.getAttribute("href").replace(/^\/about/, `/about?lang=${LANG}`); });
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const Q = new URLSearchParams(location.search);
+const DEBUG = Q.has("debug");
+const store = I18N.store;          // настройки в браузере (ключи temet.*)
+// галочка «черновики»: видна только изнутри сети (сервер сообщает drafts_allowed), выбор запоминается
+$("drafts").checked = Q.has("drafts") || !!store.get("drafts");
+$("drafts").addEventListener("change", () => store.set("drafts", $("drafts").checked));
+let L = { bodies: {}, signs: {}, aspects: {}, dignities: {}, dimensions: {}, houses: {}, modes: {} };
+const lb = (g, c) => (L[g] && L[g][c]) ?? c;
+// кнопка в шапке ведёт к форме: прокрутка и курсор в поле даты рождения
+function startForm() {
+  $("formA").closest(".card").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  setTimeout(() => $("adate").focus({ preventScroll: true }), 350);
+}
+
+function birthForm(p) {
+  return `<div class="grid">
+    <div><label>${t("f_date")}</label><input id="${p}date" type="date"></div>
+    <div><label>${t("f_time")}</label><input id="${p}time" type="time"></div>
+    <div><label>${t("f_unc")}</label><input id="${p}unc" type="number" value="10" min="0"></div>
+    <div class="span2"><label>${t("f_place")}</label><input id="${p}place" placeholder="${esc(t("f_place_ph"))}" autocomplete="off"><div class="places" id="${p}places"></div></div>
+  </div>
+  <details style="margin-top:8px"><summary>${t("f_coords")}</summary>
+    <div class="grid" style="margin-top:8px">
+      <div><label>${t("f_lat")}</label><input id="${p}lat"></div>
+      <div><label>${t("f_lon")}</label><input id="${p}lon"></div>
+      <div><label>${t("f_tz")}</label><input id="${p}tz" placeholder="Europe/Zurich"></div>
+    </div></details>`;
+}
+$("formA").innerHTML = birthForm("a");
+$("formB").innerHTML = birthForm("b");
+const FIELDS = ["date", "time", "unc", "place", "lat", "lon", "tz"];
+function fill(p, v) { if (v) FIELDS.forEach(f => { if (v[f] != null) $(p + f).value = v[f]; }); }
+function readForm(p) { const v = {}; FIELDS.forEach(f => v[f] = $(p + f).value); return v; }
+fill("a", store.get("a")); fill("b", store.get("b"));
+$("bname").value = store.get("bname") || "";
+
+function birth(p) {
+  const v = readForm(p);
+  if (!v.date) throw new Error(t("err_date"));
+  if (!v.lat || !v.lon || !v.tz) throw new Error(t("err_place"));
+  return { date: v.date, time: v.time || null, tz: v.tz, lat: +v.lat, lon: +v.lon,
+           uncertainty_min: v.time ? +(v.unc || 10) : null, place_label: v.place };
+}
+async function api(path, opts) {
+  const s = $("status"); s.style.display = ""; s.textContent = t("busy");
+  try {
+    const r = await fetch(path, opts); const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.status);
+    return j;
+  } finally { s.style.display = "none"; }
+}
+function bindPlaces(p) {
+  let tm;
+  $(p + "place").addEventListener("input", () => {
+    clearTimeout(tm);
+    tm = setTimeout(async () => {
+      const q = $(p + "place").value.trim(); const box = $(p + "places");
+      if (q.length < 2) { box.innerHTML = ""; return; }
+      try {
+        const r = await fetch("/api/places?q=" + encodeURIComponent(q)); const rows = r.ok ? await r.json() : [];
+        box.innerHTML = rows.map(r => `<div data-r='${esc(JSON.stringify(r))}'>${esc(r.name)}, ${esc(r.country)} · ${esc(r.tz)}</div>`).join("");
+        box.querySelectorAll("div").forEach(el => el.onclick = () => {
+          const r = JSON.parse(el.dataset.r);
+          $(p + "lat").value = r.lat; $(p + "lon").value = r.lon; $(p + "tz").value = r.tz; $(p + "place").value = r.name;
+          box.innerHTML = "";
+        });
+      } catch (e) { box.innerHTML = ""; }
+    }, 250);
+  });
+}
+bindPlaces("a"); bindPlaces("b");
+if (window.wheelInteract) { wheelInteract($("out")); wheelInteract($("pair")); }
+
+fetch(`/api/doctrine?locale=${LANG}`).then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  L = { ...j.labels, sign_order: j.sign_order };
+  $("draftsBox").hidden = !j.drafts_allowed;
+  if (!j.drafts_allowed) $("drafts").checked = false;
+  if (window.NeoSky) NeoSky.init(j);
+  // режимы совместимости — кнопками; выбранный хранится в скрытом поле
+  const modes = Object.entries(L.modes || {});
+  $("pmodes").innerHTML = modes.map(([k, v]) => `<button type="button" data-m="${k}" onclick="pickMode('${k}')">${esc(v)}</button>`).join("");
+  pickMode(store.get("mode") || (modes[0] || [])[0]);
+}).catch(() => {});
+
+const moreLabel = n => t("more_items", { n });
+// API на языке страницы; ?drafts — показывать черновики текстов
+const q = (path, extra) => `${path}?locale=${LANG}&drafts=${$("drafts").checked}${extra || ""}`;
+function itemHtml(i, sub) {
+  if (i.group && i.group.length && !sub) {
+    const lead = { ...i, group: null };
+    return `<div class="item group"><h3>${esc(i.group_title || i.title)}</h3>${itemHtml(lead, true)}
+      <details class="more"><summary>${moreLabel(i.group.length)}</summary>${i.group.map(g => itemHtml(g, true)).join("")}</details></div>`;
+  }
+  const x = i.text, H = sub ? "h4" : "h3", cls = sub ? "item sub" : "item";
+  const dbg = DEBUG ? `<div class="dbg">${esc(i.key)} · ${i.salience}</div>` : "";
+  const pills = (i.tags || []).map(x => ` <span class="pill">${esc(x)}</span>`).join("");
+  if (!x) return `<div class="${cls}"><${H}>${esc(i.title)}</${H}>${pills ? `<div class="fact">${pills}</div>` : ""}${i.detail ? `<div class="fact">${esc(i.detail)}</div>` : ""}<div class="pending">${esc(i.pending || t("pending_item"))}</div>${dbg}</div>`;
+  const badge = x._status === "draft" ? `<span class="badge">${esc(t("draft"))}</span>` : "";
+  const lab = { life: t("lab_life"), strength: t("lab_strength"), shadow: t("lab_shadow"), action: t("lab_action"), ...(i.labels || {}) };
+  const life = Array.isArray(x.in_life) && x.in_life.length
+    ? `<div class="facets"><b>${esc(lab.life)}:</b><ul class="life">${x.in_life.map(y => `<li>${esc(String(y).replace(/[.;]\s*$/, ""))}</li>`).join("")}</ul></div>` : "";
+  const facets = [[lab.strength, x.strength], [lab.shadow, x.shadow], [lab.action, x.action]]
+    .filter(([, v]) => v).map(([k, v]) => `<div><b>${k}:</b>${esc(v)}</div>`).join("");
+  return `<div class="${cls}"><${H}>${esc(x.title || i.title)}${badge}</${H}>
+    ${x.title ? `<div class="fact">${esc(i.title)}${pills}</div>` : ""}${i.detail ? `<div class="fact">${esc(i.detail)}</div>` : ""}${i.scope ? `<div class="scope">${esc(i.scope)}</div>` : ""}
+    <p>${esc(x.body)}</p>${life}${facets ? `<div class="facets">${facets}</div>` : ""}${dbg}</div>`;
+}
+// подпись под кругом: откуда взялись цвета неба
+function skyNote(sky) {
+  const dot = c => `<i style="background:${esc(c)};color:${esc(c)}"></i>`;
+  const parts = sky.anchors.map(a => `<span>${dot(a.color)}${esc(t("sky_anchor", { body: lb("bodies", a.body), sign: lb("signs", a.sign) }))}</span>`);
+  if (sky.lead) parts.push(`<span>${dot(sky.lead.color)}${esc(t("sky_lead", { body: lb("bodies", sky.lead.body) }))}</span>`);
+  return `<div class="palette-note"><span class="lead">${esc(t("sky_title"))}</span>${parts.join("")}</div>`;
+}
+const dms = x => { const d = Math.floor(x + 1e-9), m = Math.floor((x - d) * 60 + 1e-6); return `${d}°${String(m).padStart(2, "0")}′`; };
+const compactChart = c => ({ bodies: c.bodies, cusps: c.cusps, time_known: c.meta.time_known });
+
+async function calc() {
+  try {
+    store.set("a", readForm("a"));
+    const j = await api(q("/api/chart"), { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(birth("a")) });
+    const c = j.chart, r = j.report;
+    const notes = [];
+    if (!c.meta.time_known) notes.push(t("no_time"));
+    if (c.meta.flags.some(f => f.includes("local_time"))) notes.push(t("dst"));
+    const written = r.modules.reduce((n, m) => n + m.items.filter(i => i.text).length, 0);
+    const total = r.modules.reduce((n, m) => n + m.items.length, 0);
+    if (written < total) notes.push(t("texts_ready", { a: written, b: total }));
+    const wheel = natalWheel({ chart: compactChart(c), labels: L, aspects: c.aspects.filter(a => a.strength >= 0.5),
+                               strong: c.dominance.order.slice(0, 3) });
+    const mods = r.modules.filter(m => m.items.length).map(m => {
+      const main = m.items.filter(i => i.main), rest = m.items.filter(i => !i.main);
+      const more = rest.length ? `<details class="more"><summary>${m.background
+          ? t("show_n", { n: rest.length }) : moreLabel(rest.length)}</summary>${rest.map(i => itemHtml(i)).join("")}</details>` : "";
+      const intro = m.background ? `<p class="note">${esc(t("intro_bg"))}</p>` : m.synthesis ? `<p class="note">${esc(t("intro_syn"))}</p>` : "";
+      return `<div class="card"><h2>${esc(m.label)}</h2>${intro}${main.map(i => itemHtml(i)).join("")}${more}</div>`;
+    }).join("");
+    const rows = Object.entries(c.bodies).filter(([, v]) => v.shown).map(([k, v]) =>
+      `<tr><td>${esc(lb("bodies", k))}${v.retro ? ' <span class="pill">R</span>' : ''}</td><td>${dms(v.deg_in_sign)} ${esc(lb("signs", v.sign))}</td><td>${v.house ?? "—"}</td><td>${esc(lb("bodies", v.dispositor ?? ""))}</td><td>${v.dignity ? esc(lb("dignities", v.dignity.kind)) : ""}</td></tr>`).join("");
+    const asp = c.aspects.slice(0, 20).map(a => `<tr><td>${esc(lb("bodies", a.a))} — ${esc(lb("bodies", a.b))}</td><td>${esc(lb("aspects", a.aspect))}</td><td>${dms(a.orb)}</td></tr>`).join("");
+    const sky = paintSky(c);
+    $("out").innerHTML = `
+      <section class="wheel-wrap" aria-label="${esc(t("wheel_aria"))}">${wheel}${sky ? skyNote(sky) : ""}
+        <p class="note center"><a href="/about?lang=${LANG}#wheel">${esc(t("wheel_link"))}</a></p>
+        ${notes.length ? `<p class="note center">${notes.map(esc).join("<br>")}</p>` : ""}</section>
+      ${mods}
+      <div class="card"><details><summary>${esc(t("tech"))}</summary>
+        <p class="note">${esc(t("tech_meta", { utc: c.meta.utc, off: c.meta.utc_offset_h, hs: c.meta.house_system }))}</p>
+        <table><tr><th>${t("th_body")}</th><th>${t("th_pos")}</th><th>${t("th_house")}</th><th>${t("th_ruler")}</th><th>${t("th_state")}</th></tr>${rows}</table>
+        <table><tr><th>${t("th_aspect")}</th><th>${t("th_type")}</th><th>${t("th_orb")}</th></tr>${asp}</table>
+      </details></div>`;
+  } catch (e) { $("out").innerHTML = `<div class="card warn">${esc(e.message)}</div>`; }
+}
+
+// ---------------------------------------------------------------- небо: перекрашивается один раз на карту
+let SKY = { id: null, legend: null };
+function paintSky(c) {
+  if (!window.NeoSky) return null;
+  if (SKY.id !== c.meta.jd_ut) { SKY.legend = NeoSky.fromChart(c); SKY.id = c.meta.jd_ut; }
+  return SKY.legend;
+}
+
+// ---------------------------------------------------------------- прогноз
+const MON_G = t("months_gen"), MON_N = t("months"), WD = t("weekdays");
+const NOW_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { return null; } })();
+const ymd = iso => [+iso.slice(0, 4), +iso.slice(5, 7), +iso.slice(8, 10)];
+const isoDay = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+const monday = dt => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - (dt.getDay() + 6) % 7);
+let FC = { period: "week", start: null, year: null };
+const fday = iso => { const [y, m, d] = ymd(iso); return t(y !== FC.year ? "day_year" : "day", { d, mon: MON_G[m - 1], y }); };
+const ftime = iso => iso.slice(11, 16);
+
+function fcReset() { const t = new Date(); FC.start = isoDay(FC.period === "week" ? monday(t) : new Date(t.getFullYear(), t.getMonth(), 1)); }
+function fcShift(n) {
+  const [y, m, d] = ymd(FC.start);
+  FC.start = isoDay(FC.period === "week" ? new Date(y, m - 1, d + 7 * n) : new Date(y, m - 1 + n, 1));
+  forecast();
+}
+function fcOpen(p) { if (FC.period !== p || !FC.start) { FC.period = p; fcReset(); } forecast(true); }
+function fcPeriod(p) {        // при смене периода остаёмся в том же месяце
+  if (FC.period === p) return;
+  const [y, m] = ymd(FC.start), t = new Date();
+  FC.period = p;
+  FC.start = isoDay(p === "month" ? new Date(y, m - 1, 1)
+    : monday(t.getFullYear() === y && t.getMonth() === m - 1 ? t : new Date(y, m - 1, 1)));
+  forecast();
+}
+async function forecast(scroll) {
+  try {
+    store.set("a", readForm("a"));
+    if (!FC.start) fcReset();
+    const body = { ...birth("a"), period: FC.period, start: FC.start, tz_now: NOW_TZ };
+    const j = await api(q("/api/forecast"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    paintSky(j.chart);
+    $("fc").innerHTML = forecastHtml(j.forecast, j.chart);
+    if (scroll) $("fc").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  } catch (e) { $("fc").innerHTML = `<div class="card warn">${esc(e.message)}</div>`; }
+}
+
+function fcOpenRow(i) {        // ключевой день → строка ленты: раскрыть (и свёрнутый блок «Ещё…», если она там) и показать
+  const el = document.getElementById(`tl-${i}`);
+  if (!el) return false;
+  const outer = el.parentElement.closest("details");
+  if (outer) outer.open = true;
+  el.open = true;
+  el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  return false;
+}
+function fcSpan(it) {
+  const a = it.start && fday(it.start), b = it.end && fday(it.end);
+  if (a && b) return t("span_from_to", { a, b });
+  if (b) return t("span_until", { b });
+  return a ? t("span_from", { a }) : t("span_all");
+}
+function fcWhen(it, shorts) {
+  const k = it.kind, ex = it.exacts || [];
+  const at = x => t("at", { d: fday(x), t: ftime(x) });
+  const span = fcSpan(it);
+  let s;
+  if (k === "lun" || k === "ecl") s = t("w_point", { at: at(ex[0]) });
+  else if (k === "moon") s = t("w_range", { a: at(it.start), b: at(it.end) });
+  else if (k === "trh") s = t("w_house", { span }) + (it.ingress && it.peak_in_window ? t("w_ingress", { at: at(it.ingress) }) : "");
+  else if (k === "retro") s = t("w_retro", { span });
+  else if (k === "pmh" || k === "pms") s = t("w_lasts", { span });
+  else s = t("w_active", { span }) + (ex.length ? t("w_exact", { list: ex.map(at).join(", ") }) : "") + (ex.length > 1 ? t("w_multi") : "");
+  if (it.station) s += t(it.station.dir === "R" ? "w_station_R" : "w_station_D", { at: at(it.station.jd) });
+  if (it.promise > 0) s += t("w_promise", { a: lb("bodies", it.body), b: lb("bodies", it.point),
+                                            asp: it.promise_aspect ? ` (${lb("aspects", it.promise_aspect).toLowerCase()})` : "" });
+  const conf = (it.confirmed || []).map(k => shorts[k]).filter(Boolean);
+  if (conf.length) s += t("w_confirm", { list: conf.join("; ") });
+  if (it.date_uncertainty_days >= 1) s += t("w_approx", { n: Math.round(it.date_uncertainty_days) });
+  return s;
+}
+function fcColor(it) {
+  if (it.kind === "tr" || it.kind === "pm") return it.cls === "SOFT" ? "var(--harm)" : it.cls === "HARD" ? "var(--tense)" : "var(--acc)";
+  if (it.kind === "lun" || it.kind === "ecl") return "var(--acc)";
+  if (it.kind === "retro") return "var(--partner)";
+  return "var(--mute)";
+}
+function forecastHtml(f, c) {
+  const w0 = Date.parse(f.window.start), w1 = Date.parse(f.window.end);
+  const [sy, sm, sd] = ymd(f.window.start);
+  FC.year = sy;
+  const n = Math.round((w1 - w0) / 864e5);
+  const day = i => new Date(Date.UTC(sy, sm - 1, sd + i));
+  const last = day(n - 1);
+  const head = FC.period === "week"
+    ? t("range", { a: t("day", { d: sd, mon: MON_G[sm - 1] }), b: t("day", { d: last.getUTCDate(), mon: MON_G[last.getUTCMonth()] }) })
+    : t("month_year", { mon: MON_N[sm - 1], y: sy });
+  const pos = iso => (Date.parse(iso) - w0) / (w1 - w0);
+  const pct = x => `${(100 * x).toFixed(2)}%`;
+  const all = [...f.main, ...f.timeline, ...f.background];
+  const shorts = Object.fromEntries(all.filter(x => x.key).map(x => [x.key, x.short || x.title]));
+  const short = it => it.short || it.title;
+  const pend = t("pending_event");
+  const FC_LABELS = { life: t("fc_life"), strength: t("fc_strength"), shadow: t("fc_shadow"), action: t("fc_action") };
+  const asItem = (it, sub) => itemHtml({ key: it.key, title: it.title, text: it.text, salience: it.score,
+                                         detail: (it.note ? it.note + " " : "") + fcWhen(it, shorts),
+                                         pending: pend, labels: FC_LABELS }, sub);
+  const days = Array.from({ length: n }, (_, i) => {
+    const dt = day(i), d = dt.getUTCDate();
+    return `<span class="${FC.period === "month" && d % 5 && d !== 1 ? "minor" : ""}">${FC.period === "week" ? WD[dt.getUTCDay()] + " " + d : d}</span>`;
+  }).join("");
+  const row = it => {
+    const idx = f.timeline.indexOf(it);
+    const s = it.start ? pos(it.start) : -1, e = it.end ? pos(it.end) : 2;
+    const L = Math.max(0, Math.min(1, s)), R = Math.max(0, Math.min(1, e));
+    const bar = R > L ? `<span class="tbar${s < 0 ? " ol" : ""}${e > 1 ? " or" : ""}${it.kind === "retro" ? " dash" : ""}" style="left:${pct(L)};width:${pct(R - L)}"></span>` : "";
+    const marks = (it.exacts || []).map(pos).filter(p => p >= 0 && p <= 1).map(p => `<i class="mark" style="left:${pct(p)}"></i>`).join("")
+      + (it.station && pos(it.station.jd) >= 0 && pos(it.station.jd) <= 1 ? `<i class="mark ring" style="left:${pct(pos(it.station.jd))}"></i>` : "");
+    return `<details class="tl-it" id="tl-${idx}" style="--c:${fcColor(it)}"><summary><span class="lab${it.main ? " main" : ""}">${esc(short(it))}</span><span class="track" style="--n:${n}">${bar}${marks}</span></summary>
+      <div class="tl-body">${asItem(it, true)}</div></details>`;
+  };
+  // ключевые дни: точные касания и развороты планет, сложенные по датам
+  const dayMap = {};
+  f.timeline.forEach((it, idx) => {
+    const pts = [...(it.exacts || []), ...(it.station ? [it.station.jd] : [])].filter(x => pos(x) >= 0 && pos(x) < 1);
+    for (const x of new Set(pts.map(x => x.slice(0, 10)))) {
+      const e = dayMap[x] || (dayMap[x] = { score: 0, items: [], main: false });
+      e.score += it.score; e.items.push(idx); e.main = e.main || !!it.main;
+    }
+  });
+  const dayList = Object.entries(dayMap).sort((a, b) => b[1].score - a[1].score);
+  const best = dayList.length ? dayList[0][1].score : 0;
+  const dayCap = FC.period === "week" ? 3 : 5;
+  const keyDays = [...dayList.filter(([, e]) => e.main), ...dayList.filter(([, e]) => !e.main && e.score >= 0.5 * best)]
+    .slice(0, dayCap).sort((a, b) => a[0] < b[0] ? -1 : 1);
+  const keyHtml = keyDays.length ? `<h3 class="sec">${esc(t("key_days"))}</h3><div class="keydays">${keyDays.map(([dte, e]) =>
+    `<div><b>${esc(fday(dte))}</b><span>${e.items.map(i => `<a href="#tl-${i}" onclick="return fcOpenRow(${i})">${esc(short(f.timeline[i]))}</a>`).join("; ")}</span></div>`).join("")}</div>` : "";
+  // в ленте — главное и самые весомые события по порядку дат, остальные свёрнуты
+  const cap = FC.period === "week" ? 10 : 14;
+  const top = new Set([...f.timeline].sort((a, b) => b.score - a.score).slice(0, cap));
+  const shown = f.timeline.filter(it => top.has(it) || it.main), hidden = f.timeline.filter(it => !top.has(it) && !it.main);
+  const moon = f.moon.length ? `<h3 class="sec">${esc(t("moon_days"))}</h3>
+    <p class="note intro">${esc(t("moon_intro"))}</p>
+    <div class="tl"><div class="moon-track">${f.moon.map(m => { const L = Math.max(0, pos(m.start)), R = Math.min(1, pos(m.end));
+      return `<span style="left:${pct(L)};width:${pct(R - L)}" title="${esc(m.title)}">${m.house}</span>`; }).join("")}</div>
+    ${f.moon.map(m => `<details class="tl-it" style="--c:var(--b-MOON, var(--fg))"><summary><span class="lab">${esc(fday(m.start < f.window.start ? f.window.start : m.start))}: ${esc(short(m))}</span><span class="track" style="--n:${n}"><span class="tbar" style="left:${pct(Math.max(0, pos(m.start)))};width:${pct(Math.min(1, pos(m.end)) - Math.max(0, pos(m.start)))}"></span></span></summary>
+      <div class="tl-body">${asItem(m, true)}</div></details>`).join("")}</div>` : "";
+  const bg = f.background.length ? `<details class="more"><summary>${esc(t("bg_summary", { n: f.background.length }))}</summary>
+      <p class="note">${esc(t("bg_intro"))}</p>${f.background.map(it => asItem(it)).join("")}</details>` : "";
+  const asp = [...f.main, ...f.timeline].filter(it => it.kind === "tr" && it.peak_in_window)
+    .map(it => ({ a: it.point, b: it.body, aspect: it.aspect, strength: it.strength ?? 1 }));
+  const wheel = natalWheel({ chart: compactChart(c), outer: { bodies: f.sky.bodies }, labels: L, aspects: asp,
+    strong: c.dominance.order.slice(0, 3), outerLegend: t("fc_outer_legend"), outerTip: t("fc_outer_tip") });
+  const gaps = (f.content_gaps || []).length;
+  const notes = [];
+  if (!f.time_known) notes.push(t("fc_no_time"));
+  if (gaps) notes.push(t("fc_gaps", { n: gaps }));
+  const tzNote = f.window.tz ? t("fc_tz", { tz: f.window.tz }) : "";
+  return `<section class="card fc">
+    <div class="fc-head"><button class="ghost nav" onclick="fcShift(-1)" aria-label="${esc(t("prev"))}">‹</button>
+      <h2>${esc(head)}</h2><button class="ghost nav" onclick="fcShift(1)" aria-label="${esc(t("next"))}">›</button></div>
+    <div class="fc-sub"><span class="seg"><button type="button" class="${FC.period === "week" ? "on" : ""}" onclick="fcPeriod('week')">${esc(t("week"))}</button><button type="button" class="${FC.period === "month" ? "on" : ""}" onclick="fcPeriod('month')">${esc(t("month"))}</button></span>
+      ${f.intensity.label ? `<span class="pill" title="${esc(t("intensity_tip", { p: Math.round(f.intensity.pct) }))}">${esc(f.intensity.label)}</span>` : ""}</div>
+    ${notes.length ? `<p class="note center">${notes.map(esc).join("<br>")}</p>` : ""}
+    <h3 class="sec">${esc(t("main"))}</h3>
+    ${f.main.map(it => asItem(it)).join("") || `<p class="note">${esc(t("calm"))}</p>`}
+    ${keyHtml}
+    <h3 class="sec">${esc(t("by_day"))}</h3>
+    <p class="note intro">${esc(t("click_row"))}</p>
+    <div class="tl"><div class="tl-days">${days}</div>${shown.map(row).join("")}
+      ${hidden.length ? `<details class="more"><summary>${esc(t("more_events", { n: hidden.length }))}</summary>${hidden.map(row).join("")}</details>` : ""}</div>
+    <div class="legend-row"><span style="--c:var(--harm)"><i></i>${esc(t("lg_harm"))}</span><span style="--c:var(--tense)"><i></i>${esc(t("lg_tense"))}</span><span style="--c:var(--acc)"><i></i>${esc(t("lg_conj"))}</span><span style="--c:var(--mute)"><i></i>${esc(t("lg_house"))}</span><span style="--c:var(--partner)"><i style="background:repeating-linear-gradient(90deg,var(--c) 0 5px,transparent 5px 8px)"></i>${esc(t("lg_retro"))}</span><span>${esc(t("lg_exact"))}</span><span>${esc(t("lg_station"))}</span></div>
+    <details class="more howto"><summary>${esc(t("howto"))}</summary>
+      ${t("howto_html").replace(/href="\/about/g, `href="/about?lang=${LANG}`)}
+    </details>
+    ${moon}
+    <h3 class="sec">${esc(t("sky_period"))}</h3>
+    <div class="wheel-wrap">${wheel}<p class="note center"><a href="/about?lang=${LANG}#wheel">${esc(t("wheel_link"))}</a></p></div>
+    ${bg}
+    <p class="note center">${esc(tzNote)}</p>
+  </section>`;
+}
+
+function pickMode(m) {
+  if (!m) return;
+  $("pmode").value = m; store.set("mode", m);
+  document.querySelectorAll("#pmodes button").forEach(b => b.classList.toggle("on", b.dataset.m === m));
+}
+// совместимость появляется по кнопке, а не сразу на начальной странице; та же кнопка (или «Закрыть») её убирает
+const smooth = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+function setCompat(open) {
+  $("compatCard").hidden = !open;
+  $("compatBtn").classList.toggle("on", open);
+  $("compatBtn").setAttribute("aria-expanded", String(open));
+}
+function openCompat() {
+  setCompat(true);
+  $("compatCard").scrollIntoView({ behavior: smooth(), block: "start" });
+}
+function closeCompat() {          // введённые данные и результат остаются: при новом открытии всё на месте
+  setCompat(false);
+  $("compatBtn").scrollIntoView({ behavior: smooth(), block: "center" });
+  $("compatBtn").focus({ preventScroll: true });
+}
+function toggleCompat() { $("compatCard").hidden ? openCompat() : closeCompat(); }
+// Один контакт = одна строка: зеркальные пары из двух направлений склеиваются,
+// у каждой строки — тема и, если контакт односторонний, для кого он важнее.
+function mergeContacts(p) {
+  const m = new Map();
+  const put = (key, base, side, x) => {
+    const e = m.get(key) || { ...base, you: 0, them: 0, dims: {} };
+    e[side] += x.contribution;
+    for (const [d, v] of Object.entries(x.dims || {})) e.dims[d] = (e.dims[d] || 0) + v;
+    m.set(key, e);
+  };
+  for (const x of p.a_receives_from_b)
+    x.type === "aspect"
+      ? put(`a|${x.receiver}|${x.sender}|${x.aspect}`, { type: "aspect", youBody: x.receiver, themBody: x.sender, aspect: x.aspect, orb: x.orb }, "you", x)
+      : put(`o|you|${x.sender}|${x.receiver_house}`, { type: "overlay", body: x.sender, owner: "them", house: x.receiver_house }, "you", x);
+  for (const x of p.b_receives_from_a)
+    x.type === "aspect"
+      ? put(`a|${x.sender}|${x.receiver}|${x.aspect}`, { type: "aspect", youBody: x.sender, themBody: x.receiver, aspect: x.aspect, orb: x.orb }, "them", x)
+      : put(`o|them|${x.sender}|${x.receiver_house}`, { type: "overlay", body: x.sender, owner: "you", house: x.receiver_house }, "them", x);
+  return [...m.values()].map(e => {
+    e.total = e.you + e.them;
+    e.main = Object.keys(e.dims).sort((a, b) => Math.abs(e.dims[b]) - Math.abs(e.dims[a]))[0];
+    return e;
+  }).sort((a, b) => Math.abs(b.total) - Math.abs(a.total)).slice(0, 10);
+}
+
+function contactLine(e, name) {
+  const them = name || t("them"), you = t("you");
+  const sign = e.total >= 0 ? '<span class="plus">+</span>' : '<span class="minus">−</span>';
+  const theme = e.main ? ` · <span class="note">${esc(lb("dimensions", e.main).toLowerCase())}</span>` : "";
+  let side = "";
+  if (Math.abs(e.you) > 3 * Math.abs(e.them)) side = ` · <span class="note">${esc(t("more_you"))}</span>`;
+  else if (Math.abs(e.them) > 3 * Math.abs(e.you)) side = ` · <span class="note">${esc(t("more_them", { who: them }))}</span>`;
+  if (e.type === "overlay") {
+    const who = `${lb("bodies", e.body)} (${e.owner === "them" ? them : you})`;
+    const hl = (lb("houses", String(e.house)) || "").toLowerCase();
+    const v = { who, h: e.house, hl, name };
+    return `${sign} ${esc(t(e.owner === "them" ? "ov_yours" : name ? "ov_named" : "ov_their", v))}${theme}`;
+  }
+  return `${sign} ${esc(t("contact", { tb: lb("bodies", e.themBody), them, yb: lb("bodies", e.youBody), you,
+                                      asp: lb("aspects", e.aspect).toLowerCase(), orb: e.orb }))}${theme}${side}`;
+}
+
+async function compare() {
+  try {
+    store.set("a", readForm("a")); store.set("b", readForm("b"));
+    const name = $("bname").value.trim(); store.set("bname", name);
+    const who = name || t("other_person");
+    const body = { a: birth("a"), b: birth("b"), mode: $("pmode").value };
+    const p = await api(`/api/synastry?locale=${LANG}`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
+    const asp = [...p.a_receives_from_b.filter(x => x.type === "aspect").map(x => ({ a: x.receiver, b: x.sender, aspect: x.aspect, strength: 1 })),
+                 ...p.b_receives_from_a.filter(x => x.type === "aspect").map(x => ({ a: x.sender, b: x.receiver, aspect: x.aspect, strength: 1 }))];
+    const wheel = natalWheel({ chart: p.charts.a, outer: p.charts.b, labels: L, aspects: asp, strong: p.charts.a.strong });
+    const dims = Object.entries(p.dims).map(([d, v]) => `<tr><td>${esc(lb("dimensions", d))}</td>
+      <td style="width:28%"><div class="bar"><i style="width:${v.a_receives_pct ?? 0}%"></i></div></td><td>${v.a_receives_pct ?? "—"}</td>
+      <td style="width:28%"><div class="bar"><i style="width:${v.b_receives_pct ?? 0}%"></i></div></td><td>${v.b_receives_pct ?? "—"}</td></tr>`).join("");
+    const asym = Math.abs((p.a_receives_pct ?? 0) - (p.b_receives_pct ?? 0));
+    $("pair").innerHTML = `
+      <div style="margin-top:18px" class="row"><span class="score">${p.score ?? "—"}</span>
+        <span class="note">${t("out_of", { mode: esc(lb("modes", p.mode)) })}</span></div>
+      <p class="note">${esc(t("receive", { a: p.a_receives_pct, who, b: p.b_receives_pct }))}
+        ${asym > 30 ? esc(t("asym")) : ""}</p>
+      <table><tr><th>${esc(t("th_theme"))}</th><th colspan="2">${esc(t("you_receive"))}</th><th colspan="2">${esc(t("they_receive", { who }))}</th></tr>${dims}</table>
+      <div style="margin-top:14px">${wheel}</div>
+      <h3 style="font-size:16px;margin:14px 0 6px">${esc(t("links"))}</h3>
+      ${mergeContacts(p).map(e => `<div class="contact">${contactLine(e, name)}</div>`).join("") || `<p class="note">${esc(t("no_links"))}</p>`}
+      <p class="note">${esc(t("links_note", { attr: lb("dimensions", "attraction").toLowerCase() }))}</p>`;
+  } catch (e) { $("pair").innerHTML = `<p class="warn">${esc(e.message)}</p>`; }
+}
+
+</script>
+</body>
+</html>

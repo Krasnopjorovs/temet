@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en" data-page-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temet nosce — how it works</title>
+<link rel="stylesheet" href="/static/site.css">
+<script src="/static/i18n.js"></script>
+</head>
+<body>
+<div class="sky" id="skyA" aria-hidden="true"><canvas></canvas></div><div class="sky off" id="skyB" aria-hidden="true"><canvas></canvas></div>
+<main class="doc">
+  <header class="hero">
+    <nav class="seg lang" data-lang-switch aria-label="Language"></nav>
+    <p class="back"><a href="/" lang="la">← Temet nosce</a></p>
+    <h1>How it works</h1>
+    <p>What the service can do, how to read the birth chart report, the forecast and compatibility, what the colours and lines mean, and how accurate it all is.</p>
+  </header>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#use">How to use it</a><a href="#natal">Birth chart</a><a href="#wheel">Chart wheel</a>
+    <a href="#colours">Colours</a><a href="#aspects">Tension and harmony</a><a href="#forecast">Forecast</a>
+    <a href="#synastry">Compatibility</a><a href="#accuracy">Accuracy and limits</a><a href="#privacy">Privacy</a>
+  </nav>
+
+  <section class="card" id="use">
+    <h2>How to use it</h2>
+    <ol>
+      <li><b>Birth data.</b> Enter the date, time and city of birth and pick the city from the list: the coordinates and time zone are filled in for you. If you only know the time roughly, set the accuracy in minutes. If the time is unknown, leave the field empty: then the houses, the Ascendant and the progressed Moon are not calculated, and the Moon's position is given with a margin.</li>
+      <li><b>“Calculate chart”</b> gives the birth chart report: the chart wheel and texts for each area of life.</li>
+      <li><b>“Forecast for the week” and “Forecast for the month”</b> show what falls on the current period. The ‹ › arrows move between weeks or months, and the switch changes the period. Dates and times follow your device's time zone.</li>
+      <li><b>Compatibility</b>: enter the other person's data, choose what you are looking for (<span class="modeList"></span>) and press “Compare charts”.</li>
+    </ol>
+    <p>Birth data is remembered only in your browser, so you don't have to enter it again next time.</p>
+  </section>
+
+  <section class="card" id="natal">
+    <h2>Birth chart</h2>
+    <p>A birth chart is a snapshot of the sky at the moment and place of birth. It has four layers of meaning:</p>
+    <ul>
+      <li><b>Planet: “what”</b>, a function of the psyche. The Sun is will and sense of self, the Moon is emotions and the need for safety, Mercury is thinking and speech, Venus is what you love and value, Mars is how you act, Jupiter is growth and faith, Saturn is responsibility and fears, Uranus is freedom and change, Neptune is imagination and compassion, Pluto is power and rebirth.</li>
+      <li><b>Sign: “how”</b>, the style in which the function works.</li>
+      <li><b>House: “where”</b>, the area of life: body, money, communication, home, creativity, work, partnership, crises, worldview, vocation, friends, the hidden. Houses are counted from the Ascendant, so they need an exact time and place.</li>
+      <li><b>Aspect: “together or against”</b>, whether two functions help each other or argue (more in the “Tension and harmony” section).</li>
+    </ul>
+    <h3>How the report is built</h3>
+    <ul>
+      <li><b>Chart highlights</b>: the leading planets the chart rests on, and imbalances of elements and modalities. Leading planets are found through links: which planets rule the signs and houses of others and how they are connected by aspects.</li>
+      <li><b>How it all fits together</b> is the synthesis. <i>Tension</i>: two opposite tendencies are strong in you at the same time, for example a need for closeness and a need for freedom. <i>Recurring theme</i>: several independent placements of the chart confirm one tendency. The marks “↔ …” and “recurring theme: …” on the cards below show which placements the conclusion rests on.</li>
+      <li><b>Areas of life</b>: core of the personality, intimacy, work and money, mind, depth, karma. The first cards of a section weigh the most in your chart; the rest are under “N more placements”.</li>
+      <li><b>Generational background</b>: placements of slow planets that are the same for everyone born in the same years. They are the background of the era through which personal traits show.</li>
+    </ul>
+    <h3>How a card is built</h3>
+    <p>A heading, a line with the placement (for example, “Sun in Capricorn”), the text and the fields <b>“How it shows up in life”</b>, <b>“Strength”</b>, <b>“When there is too much of it”</b> and <b>“What to do”</b>. If a field almost repeats something already shown higher up in the report, it is left out, so some cards have fewer fields.</p>
+  </section>
+
+  <section class="card" id="wheel">
+    <h2>Chart wheel</h2>
+    <ul>
+      <li><b>The ring of signs</b>: the twelve zodiac signs, each in its own colour (see “Colours”). Small ticks are every 5°, large ones every 10°.</li>
+      <li><b>Houses</b>: twelve sectors. They are counted from the Ascendant (Asc, on the left) counterclockwise; house numbers sit at the inner circle. At the top is the MC (midheaven, vocation), at the bottom the IC (roots), on the right the Dsc (partnership). If the birth time is unknown, there are no houses.</li>
+      <li><b>Planets</b>: the tick at the ring of signs stands on the exact degree, and the label shows degrees and minutes within the sign. “R” means the planet was retrograde at birth. The leading planets of the chart are in bold. The coloured dot on the inner circle is the planet's colour.</li>
+      <li><b>Aspect lines</b> are <span style="color:var(--harm)">blue</span> for harmonious aspects (trine solid, sextile dashed) and <span style="color:var(--tense)">red</span> for tense ones (square solid, opposition dashed). The thicker the line, the more exact the aspect.</li>
+      <li><b>Hover over a planet or tap it</b> to highlight its aspects and the planets linked to it; tap again to clear the highlight.</li>
+      <li><b>Double wheel.</b> In compatibility, the outer ring shows the other person's planets in <span style="color:var(--partner)">pink-lilac</span>. In the forecast, the outer ring shows where the planets are in the middle of the chosen period. Conjunctions in the double wheel are drawn in the same colour.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="colours">
+    <h2>Colours</h2>
+    <h3>The sky of the page</h3>
+    <p>Before a calculation the sky is a night sky. After it, your chart colours it: the colour of your Sun sign sets the overall tone of the sky and the page accent (buttons, field headings, marks), the colours of your Moon and Ascendant signs become clouds of the nebula, and the leading planet adds one more small cloud. The caption under the wheel says where the colours come from.</p>
+    <h3>Sign colours</h3>
+    <p>Traditional correspondences, used for the ring of signs on the wheel and the clouds in the sky.</p>
+    <div class="swatches" id="signSw"></div>
+    <h3>Planet colours</h3>
+    <p>The planet dots on the inner circle of the chart.</p>
+    <div class="swatches" id="bodySw"></div>
+    <h3>Colours with a meaning</h3>
+    <ul>
+      <li><b style="color:var(--harm)">Blue</b>: harmonious aspects.</li>
+      <li><b style="color:var(--tense)">Red</b>: tense aspects.</li>
+      <li><b style="color:var(--acc-text)">Accent colour</b> (from your chart): conjunctions, New Moons and Full Moons in the forecast.</li>
+      <li><b>Grey</b>: a planet moving through a house.</li>
+      <li><b style="color:var(--partner)">Pink-lilac</b>: the other person in compatibility; dashed, it marks retrograde motion in the forecast.</li>
+      <li><b style="color:var(--ok)">“+”</b> and <b style="color:var(--bad)">“−”</b> in compatibility: the link works for the union or creates tension.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="aspects">
+    <h2>Tension and harmony: what aspects do</h2>
+    <p>An aspect is the angle between two planets as seen from Earth. It works not only at the exact degree but also close to it (this range is called the orb); the closer to exact, the stronger.</p>
+    <ul>
+      <li><b>Conjunction (0°)</b>: two functions merge and sound together, strengthening each other; the theme comes to the front. The character of a conjunction depends on which planets meet.</li>
+      <li><b style="color:var(--harm)">Trine (120°) and sextile (60°): harmony.</b> The functions support each other: this is how natural abilities and things that come easily look. The other side is that what is easy needs no effort, so it is easy to leave it undeveloped.</li>
+      <li><b style="color:var(--tense)">Square (90°) and opposition (180°): tension.</b> The functions pull in different directions: friction, an inner argument, clashes with circumstances or people. This is not “bad”: tension is an engine, it pushes you to act and over time gives strength and skill. A square feels like pressure to act, an opposition like a swing between two poles, often through relationships with others.</li>
+    </ul>
+    <p>In the forecast, a harmonious transit is relief worth using, and a tense one is load and opportunity, not a disaster. In compatibility, in the “attraction” theme tense aspects count as a pull: a spark, not necessarily ease.</p>
+  </section>
+
+  <section class="card" id="forecast">
+    <h2>Forecast</h2>
+    <h3>What is calculated</h3>
+    <ul>
+      <li><b>Transits</b>: where the planets are in the sky on the chosen days and which aspects they make to the points of your chart: when an influence begins, when it is exact and when it leaves.</li>
+      <li><b>Transits through houses</b>: which area of life a planet is moving through now.</li>
+      <li><b>The Moon day by day</b> (in the weekly forecast): the Moon passes through a house in two to three days and sets the emotional tone of those days.</li>
+      <li><b>New Moons, Full Moons and eclipses</b>: in which house and near which points of your chart. A New Moon starts a cycle, a Full Moon is its peak, and an eclipse is a stronger lunation whose echo is felt for several months.</li>
+      <li><b>Retrograde Mercury, Venus and Mars</b>: periods of review and rework in the area of their house.</li>
+      <li><b>The progressed Moon</b>: your natal Moon moved by the rule of one day of life after birth for one year. It describes inner changes, not the outer background.</li>
+    </ul>
+    <h3>How to read it</h3>
+    <ul>
+      <li><b>Intensity</b> (“a quiet period”, “the usual rhythm”, “a busy period”, “a very busy period”) compares the period with thousands of random weeks and months of random people.</li>
+      <li><b>Highlights</b>: the weightiest events that peak inside the period. The weight depends on the planet (slow planets are themes of months, fast ones the background of days), on how important the touched point is in your chart, and on how exact the aspect is.</li>
+      <li><b>Key days</b>: the dates of exact hits of the main events and the busiest days. Click a name to read the text.</li>
+      <li><b>Day by day</b> is the timeline: a row is an influence, the bar shows the days when it is active, a dot is an exact hit, a ring is a planet turning around, and a bar running to the edge means the influence started earlier or goes on after the period. The colours are as in “Colours”. Click a row to read the text.</li>
+      <li><b>The sky of this period and your chart</b>: your chart inside, the planets in the middle of the period outside.</li>
+      <li><b>Background of the period</b>: long influences of slow planets and progressions that last longer than the chosen period and set its overall tone.</li>
+    </ul>
+    <h3>Notes next to an event</h3>
+    <ul>
+      <li><b>“…are also linked in your birth chart”</b>: the same two points have been linked by a clear aspect since birth, so the transit wakes up a familiar theme and sounds stronger.</li>
+      <li><b>“In your chart, … sit close to …”</b>: a cluster. Several points of your chart are close together and the planet passes over them one after another, so the themes of these days add up.</li>
+      <li><b>“The planet turns right on this point”</b>: a station. The theme sounds stronger and lasts longer.</li>
+      <li><b>“The planet passes this point several times”</b>: because of retrograde motion the influence comes back, and it has several exact dates.</li>
+      <li><b>“The same theme is also touched by…”</b>: two different techniques confirm the theme, for example a slow transit and a progression.</li>
+      <li><b>“The date is approximate (±N days)”</b>: this is how an inexact birth time affects transits to the Ascendant, the MC and other sensitive points.</li>
+    </ul>
+    <p>Forecast texts describe themes and windows of time, such as what becomes more visible, what you are drawn to, and what comes easier or harder. They do not describe events that will certainly happen.</p>
+  </section>
+
+  <section class="card" id="synastry">
+    <h2>Compatibility</h2>
+    <p>Two charts are laid over each other: where one person's planets stand relative to the other's planets and which of their houses they fall into. Each contact belongs to a theme: attraction, stability, karmic growth, shared work, mind. The choice “what you are looking for” changes the weight of the themes.</p>
+    <ul>
+      <li><b>The score out of 100</b> is compared with millions of random pairs: “90” means “better than 90% of random pairs”. The score is high only if it works for both of you.</li>
+      <li><b>“You receive” and “the other person receives”</b> are counted separately: a union can give one person more than the other, and the page shows this.</li>
+      <li><b>The main links</b>: the strongest contacts between the charts, each with its theme; “+” works for the union, “−” creates tension.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="accuracy">
+    <h2>Accuracy and limits</h2>
+    <ul>
+      <li><b>Calculation.</b> Planet positions are calculated with the Swiss Ephemeris and checked against independent theories of planetary motion: the difference is fractions of an arcsecond for most planets, transit and lunation dates are accurate to minutes, and eclipses match the NASA catalog.</li>
+      <li><b>Houses</b> use the Placidus system; beyond the polar circle, where it does not work, a fallback system is used.</li>
+      <li><b>Cities and time zones</b> come from the open <a href="https://www.geonames.org/">GeoNames</a> database (CC BY 4.0); the time zone on the birth date takes clock changes into account.</li>
+      <li><b>Birth time.</b> An error of 4 minutes moves the Ascendant by about 1°. So set the accuracy of the time: the report takes it into account, and the forecast shows the margin on dates.</li>
+      <li><b>The texts</b> are prepared in advance for every placement and every influence and checked; no neural network is used during the calculation, so the same data always gives the same report.</li>
+      <li><b>What this is.</b> Astrology is a language for self-understanding and conversation, not a scientific prediction: research does not confirm that events can be predicted from a chart. The texts describe tendencies and themes of time, not fate. The service does not replace advice from a doctor, lawyer or financial adviser.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="privacy">
+    <h2>Privacy</h2>
+    <ul>
+      <li>The server stores nothing: the calculation is made and returned right away.</li>
+      <li>Birth data is kept only in your browser, so the form is filled in on your next visit. To erase it, delete this site's data in your browser settings.</li>
+      <li>Fonts and scripts load from this same site, with no third-party trackers or ads.</li>
+      <li>The site runs through the Cloudflare network, which protects it from overload; the connection is encrypted.</li>
+      <li>The site's code is open: <a href="https://github.com/Krasnopjorovs/temet">github.com/Krasnopjorovs/temet</a> (AGPL‑3.0 licence). The report and forecast texts are not part of it.</li>
+    </ul>
+  </section>
+  <p class="note center"><a href="/">Back to the calculation</a></p>
+  <footer class="site-foot" data-i18n-html="footer_html"></footer>
+</main>
+<script src="/static/sky.js"></script>
+<script>
+I18N.apply();
+I18N.switcher(document.querySelector("[data-lang-switch]"));
+// sign and planet colours and mode names come from the doctrine, the same one that colours the wheel and the sky
+fetch(`/api/doctrine?locale=${I18N.lang}`).then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  if (window.NeoSky) NeoSky.init(j);
+  const P = j.palette || {}, L = j.labels || {};
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const chip = (c, name) => `<span><i style="background:${esc(c)};color:${esc(c)}"></i>${esc(name)}</span>`;
+  document.getElementById("signSw").innerHTML = (j.sign_order || []).filter(s => (P.signs || {})[s])
+    .map(s => chip(P.signs[s][0], (L.signs || {})[s] || s)).join("");
+  const order = Object.keys(L.bodies || {}).filter(b => (P.bodies || {})[b]);
+  document.getElementById("bodySw").innerHTML = order.map(b => chip(P.bodies[b], L.bodies[b])).join("");
+  document.querySelectorAll(".modeList").forEach(el => el.textContent = Object.values(L.modes || {}).map(m => `“${m}”`).join(", "));
+}).catch(() => {});
+</script>
+</body>
+</html>

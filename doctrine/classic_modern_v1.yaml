@@ -1,0 +1,665 @@
+# Доктрина = ВСЁ астрологическое знание системы. В Python-коде нет ни одной
+# астрологической константы: ни управителей, ни орбисов, ни весов синастрии.
+# Этот файл — удобная форма для редактирования; источник истины после загрузки —
+# таблицы Postgres (scripts/load_doctrine.py). Новая школа = новый YAML-файл.
+#
+# Веса синастрии ниже — АПРИОР (стартовые значения). Когда в сети появятся
+# исходы (взаимный интерес, длина переписки), матрица весов дообучается на них
+# (см. README, «Обучение весов»).
+
+code: classic_modern_v1
+title: "Классика + современные управители (Плацидус, истинный узел)"
+
+params:
+  house_system: P            # Placidus; при отказе (полярные широты) — fallback
+  house_system_fallback: O   # Porphyry
+  harmonics_N: 48            # число гармоник Фурье в эмбеддинге синастрии
+  kernel_shape: gauss        # форма ядра орбиса (см. astro/kernels.py SHAPES)
+  orb_floor: 0.25            # сила аспекта на границе орбиса
+  natal_min_strength: 0.25   # порог показа натального аспекта
+  cusp_sigma_deg: 3.0        # размытие границ домов: ±10 мин времени ≈ ±2–3° куспидов;
+                             # при N=48 ошибка ряда индикатора дома ≤ 0.2%
+  default_time_uncertainty_min: 10
+  unknown_time_window_h: 12  # время неизвестно -> равномерно по суткам
+  uncertainty_samples: 9
+  stellium_min: 3
+  balance: {high: 0.40, low: 0.10}   # доля «массы» карты в стихии/кресте
+  report_facts_per_module: 12
+  report_main_per_module: 5            # развёрнуто в модуле; остальное — под «ещё»
+  report_display_order: [overview, synthesis, core, love, career, mind, depth, karma, background]   # порядок на странице
+  report_background_module: background # положения «фон поколения» — одним свёрнутым блоком в конце
+  report_extra_modules: [{code: background, label: {ru: "Фон поколения", en: "Generational background"}}, {code: synthesis, label: {ru: "Как это складывается вместе", en: "How it all fits together"}}]
+  report_dedupe_jaccard: 0.45          # пункт, повторяющий уже показанный (доля общих значимых лемм), скрывается
+  report_pinned: ["sign:SUN:*", "sign:MOON:*", "sign:ASC:*"]   # всегда первыми и развёрнутыми
+  report_hide_unverified_channels: true  # каналы не показываются, пока соответствия не сверены с источником
+  report_group_rulers_min: 2           # два и больше управителей в одном доме — одна карточка этого дома
+  # ---- синтез: оси напряжения карты (классические полярности знаков и домов + напряжение стихий)
+  # Каждый текст корпуса размечен полюсами осей, к которым он тянет (поле axes, сила 1–3). Отчёт считает долю веса
+  # карты (заметность показанных положений) на каждом полюсе и сравнивает с популяцией (stats/<код>.synthesis.json).
+  # Оба полюса сильные — карточка напряжения synth:tension:<ось>; один полюс подтверждают несколько положений,
+  # а противоположный слаб — сквозная тема synth:theme:<ось>:<полюс> (правило свидетельств).
+  synthesis_axes:
+    - code: self_other
+      label: {ru: "Я и другой", en: "Self and other"}
+      anchor: "Овен — Весы, 1-й — 7-й дом"
+      poles:
+        - {code: self, label: {ru: "опора на себя", en: "relying on yourself"}, desc: "самостоятельность, инициатива, решать и действовать самому, своя линия, прямота"}
+        - {code: other, label: {ru: "опора на другого", en: "relying on others"}, desc: "партнёрство, учёт чужого мнения и желаний, согласие, подстройка, потребность в паре и отражении"}
+    - code: keep_transform
+      label: {ru: "Устойчивость и перерождение", en: "Stability and rebirth"}
+      anchor: "Телец — Скорпион, 2-й — 8-й дом"
+      poles:
+        - {code: keep, label: {ru: "устойчивость", en: "stability"}, desc: "устойчивость, покой, комфорт тела, своё имущество и привычный уклад, накопление, медленные перемены"}
+        - {code: transform, label: {ru: "перерождение", en: "rebirth"}, desc: "глубина, кризис и перерождение, слияние с другим, тайна, власть, готовность сжечь старое и начать заново"}
+    - code: detail_meaning
+      label: {ru: "Подробности и смысл", en: "Details and meaning"}
+      anchor: "Близнецы — Стрелец, 3-й — 9-й дом"
+      poles:
+        - {code: detail, label: {ru: "подробности", en: "details"}, desc: "факты, разговоры, любопытство ко многому сразу, информация, ближнее окружение, быстрая смена тем"}
+        - {code: meaning, label: {ru: "большой смысл", en: "the big picture"}, desc: "убеждения, вера, мировоззрение, поиск истины, дальние горизонты, учение, одна большая цель"}
+    - code: private_public
+      label: {ru: "Дом и мир", en: "Home and the world"}
+      anchor: "Рак — Козерог, 4-й — 10-й дом"
+      poles:
+        - {code: private, label: {ru: "дом и чувства", en: "home and feelings"}, desc: "семья, корни, уют, эмоциональная безопасность, частная жизнь, забота о своих"}
+        - {code: public, label: {ru: "статус и долг", en: "status and duty"}, desc: "карьера, ответственность, роль, достижение, репутация, внешняя оценка, самоконтроль ради цели"}
+    - code: close_free
+      label: {ru: "Близость и свобода", en: "Closeness and freedom"}
+      anchor: "Лев — Водолей, 5-й — 11-й дом; вода и воздух"
+      poles:
+        - {code: close, label: {ru: "близость", en: "closeness"}, desc: "тепло, нежность, привязанность, телесный контакт, потребность в другом рядом, сердечное личное выражение"}
+        - {code: free, label: {ru: "свобода", en: "freedom"}, desc: "дистанция, независимость, идеи вместо чувств, принципы, друзья и группа вместо слияния, право уйти в себя"}
+    - code: order_flow
+      label: {ru: "Порядок и поток", en: "Order and flow"}
+      anchor: "Дева — Рыбы, 6-й — 12-й дом"
+      poles:
+        - {code: order, label: {ru: "порядок", en: "order"}, desc: "анализ, контроль деталей, план, система, исправление ошибок, критичность, служение через точность"}
+        - {code: flow, label: {ru: "поток", en: "flow"}, desc: "интуиция, отпускание контроля, мечта, растворение границ, сострадание, вера, уход в тишину и воображение"}
+    - code: impulse_caution
+      label: {ru: "Порыв и осторожность", en: "Impulse and caution"}
+      anchor: "огонь — земля"
+      poles:
+        - {code: impulse, label: {ru: "порыв", en: "impulse"}, desc: "спонтанность, смелость, азарт, риск, скорость, действовать сразу и по вдохновению"}
+        - {code: caution, label: {ru: "осторожность", en: "caution"}, desc: "расчёт, сдержанность, терпение, страх ошибки, проверка перед шагом, медленное надёжное движение"}
+  synthesis_module: synthesis            # куда ставить карточки синтеза (см. report_extra_modules и report_display_order)
+  synthesis_background_weight: 0.35      # положения «фон поколения» — общий фон, а не личная черта: их вес ниже
+  synthesis_pinned_floor_pct: 90         # Солнце, Луна, Асцендент (report_pinned) весят не меньше 90-го процентиля весов отчёта
+  synthesis_tension_pct: 70              # напряжение: оба полюса оси сильнее, чем у 70% карт популяции,
+  synthesis_pair_pct: 75                 # или пара заметных текстов, тянущих в разные стороны, сильнее, чем у 75% карт
+  synthesis_theme_pct: 90                # сквозная тема: полюс сильнее, чем у 90% карт...
+  synthesis_theme_opposite_pct: 50       # ...а противоположный полюс не сильнее медианы
+  synthesis_min_side_items: 1            # у каждой стороны напряжения — хотя бы одно положение с отчётливой (≥ 2) тягой
+  synthesis_min_theme_items: 3           # сквозную тему подтверждают хотя бы три независимых свидетельства (разные планеты)
+  synthesis_max_tensions: 3
+  synthesis_max_themes: 2
+  synthesis_detail_per_side: 3           # сколько положений назвать на каждой стороне
+  report_body_first: [karma]             # модули, где тело важнее дома и для «планеты в доме»
+  # ---- прогноз (astro/forecast.py): транзиты, дома, лунации и затмения, ретроградные периоды, прогрессивная Луна
+  forecast:
+    transiting: [SUN, MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]   # аспекты к натальным точкам
+    natal_points: [SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO, ASC, MC]
+    aspect_classes: {CONJ: [CONJ], HARD: [SQR, OPP], SOFT: [TRI, SXT]}   # ключ текста — класс, в подписи — сам аспект
+    orb:            {SUN: 2.0, MERCURY: 2.0, VENUS: 2.0, MARS: 2.0, JUPITER: 2.0, SATURN: 2.0, URANUS: 1.5, NEPTUNE: 1.5, PLUTO: 1.5}
+    body_weight:    {SUN: 0.5, MERCURY: 0.35, VENUS: 0.45, MARS: 0.6, JUPITER: 0.8, SATURN: 1.0, URANUS: 1.0, NEPTUNE: 0.9, PLUTO: 1.0}
+    class_weight:   {CONJ: 1.0, HARD: 0.9, SOFT: 0.6}
+    orb_floor: 0.35              # сила аспекта на границе орбиса (в точном аспекте — 1)
+    slow: [JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]   # медленные: возвращаются петлями, их проходы — один эпизод
+    episode_gap_days: {fast: 40, slow: 150}   # проходы одного аспекта ближе этого срока — один эпизод (попятные петли)
+    scan_step_days: {SUN: 0.5, MERCURY: 0.25, VENUS: 0.5, MARS: 0.5, JUPITER: 2, SATURN: 2, URANUS: 3, NEPTUNE: 3, PLUTO: 3, MOON: 0.04}
+    horizon_days: {fast: 90, slow: 1100}              # насколько далеко искать начало и конец эпизода
+    station_orb: 1.0             # разворот планеты ближе этого к точному аспекту — тема звучит сильнее и дольше
+    station_boost: 1.6
+    promise_boost: 0.8           # «обещание карты»: те же две планеты связаны аспектом и в натале (любым; × сила аспекта)
+    promise_min_strength: 0.5    # … если этот натальный аспект заметен (та же граница, что у линий круга карты)
+    cluster_min_strength: 0.5    # «связка»: натальные точки в соединении не слабее этого проходятся транзитом вместе
+    house_transits: [SUN, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]
+    house_weight: {SUN: 0.35, MARS: 0.45, JUPITER: 0.6, SATURN: 0.7, URANUS: 0.6, NEPTUNE: 0.5, PLUTO: 0.6}
+    moon_days_for: [week]        # Луна по домам — только в недельном прогнозе
+    lunation_weight: {NEW: 0.5, FULL: 0.5}
+    eclipse_weight: {SOLAR: 1.0, LUNAR: 0.9}
+    eclipse_lunar_min: partial   # полутеневые лунные затмения не считаются
+    lunation_orb: 3.0            # новолуние/полнолуние/затмение на натальной точке — ближе этого
+    lunation_contact_boost: 0.8
+    retro_watch: [MERCURY, VENUS, MARS]
+    retro_weight: {MERCURY: 0.45, VENUS: 0.5, MARS: 0.55}
+    progressed_moon: {orb: 1.0, weight: 0.9, house_weight: 0.5, sign_weight: 0.35}
+    tropical_year_days: 365.242189
+    confirm_techniques: [slow, progressed, lunation, eclipse]   # тема подтверждена, если её задевают ≥ 2 техники
+    confirm_boost: 1.3
+    background_ratio: 2.5        # эпизод длиннее окна × N без пика внутри окна — фон периода
+    max_date_uncertainty_ratio: 0.5   # погрешность даты (от неточного времени рождения) больше доли эпизода — «дата приблизительная»
+    drop_uncertainty_ratio: 2.0       # … больше N эпизодов — не показывать
+    approx_penalty: 0.6
+    main_count: {week: 3, month: 5}
+    long_text_kinds: [ecl, pm, pmh, pms]   # полный текст; у tr/trh — для медленных планет (slow); остальное — короткий текст
+    calibration: {charts: 400, windows_per_chart: 6, year_range: [2015, 2035], seed: 11}
+    intensity_labels:            # перцентиль насыщенности окна среди случайных карт и дат → слова
+      ru: [[0, "спокойный период"], [30, "обычный ритм"], [70, "насыщенный период"], [90, "очень насыщенный период"]]
+      en: [[0, "a quiet period"], [30, "the usual rhythm"], [70, "a busy period"], [90, "a very busy period"]]
+    cases:                       # падежи для подписей: дательный, творительный, родительный (языку без падежей не нужны)
+      ru:
+        SUN: [Солнцу, Солнцем, Солнца]
+        MOON: [Луне, Луной, Луны]
+        MERCURY: [Меркурию, Меркурием, Меркурия]
+        VENUS: [Венере, Венерой, Венеры]
+        MARS: [Марсу, Марсом, Марса]
+        JUPITER: [Юпитеру, Юпитером, Юпитера]
+        SATURN: [Сатурну, Сатурном, Сатурна]
+        URANUS: [Урану, Ураном, Урана]
+        NEPTUNE: [Нептуну, Нептуном, Нептуна]
+        PLUTO: [Плутону, Плутоном, Плутона]
+        ASC: [Асценденту, Асцендентом, Асцендента]
+        MC: [MC, MC, MC]
+    templates:
+      ru:
+        aspect: {CONJ: "в соединении с {ins}", OPP: "в оппозиции к {dat}", SQR: "в квадрате к {dat}", TRI: "в трине к {dat}", SXT: "в секстиле к {dat}"}
+        class:  {CONJ: "соединение", HARD: "напряжённый аспект (квадрат или оппозиция)", SOFT: "гармоничный аспект (трин или секстиль)"}
+        tr: "{t} {phrase} вашей карты"
+        tr_key: "Транзит {gen}: {cls} к {dat} вашей карты"
+        trh: "{t} в {h}-м доме вашей карты"
+        moon: "Луна в {h}-м доме вашей карты"
+        lun: {NEW: "Новолуние", FULL: "Полнолуние"}
+        ecl: {SOLAR: "Солнечное затмение", LUNAR: "Лунное затмение"}
+        in_house: "{name} в {h}-м доме вашей карты"
+        retro: "{t} идёт попятно в {h}-м доме вашей карты"
+        pm: "Прогрессивная Луна {phrase} вашей карты"
+        pm_key: "Прогрессивная Луна: {cls} к {dat} вашей карты"
+        pmh: "Прогрессивная Луна в {h}-м доме вашей карты"
+        pms: "Прогрессивная Луна в знаке {sign}"
+        contact: "рядом с {ins} вашей карты"
+        cluster: "В вашей карте рядом с {ins} {verb} {others}: {t} на небе проходит их подряд, и темы этих дней складываются вместе."
+        cluster_verb: [стоит, стоят]     # одна точка рядом / несколько
+        short: [[" вашей карты", ""]]   # подпись строки ленты: что убрать из полного заголовка
+        notes:                     # пояснение вида влияния на странице — чтобы тексты не объясняли термин каждый раз
+          ecl: "Затмение — новолуние или полнолуние рядом с лунными узлами; в традиции его отзвук чувствуется несколько месяцев."
+          retro: "Попятное движение — видимое с Земли «движение назад»; в традиции это время пересмотра и доработки."
+          pm: "Прогрессивная Луна — Луна вашей карты, сдвинутая по правилу «день жизни за год»; она описывает внутренние перемены."
+          pmh: "Прогрессивная Луна — Луна вашей карты, сдвинутая по правилу «день жизни за год»; она описывает внутренние перемены."
+          pms: "Прогрессивная Луна — Луна вашей карты, сдвинутая по правилу «день жизни за год»; она описывает внутренние перемены."
+      en:
+        aspect: {CONJ: "conjunct your {ins}", OPP: "opposite your {dat}", SQR: "square your {dat}", TRI: "trine your {dat}", SXT: "sextile your {dat}"}
+        class:  {CONJ: "conjunction", HARD: "hard aspect (square or opposition)", SOFT: "soft aspect (trine or sextile)"}
+        tr: "{t} {phrase}"
+        tr_key: "Transiting {gen}: {cls} to your {dat}"
+        trh: "{t} in your {h_ord} house"
+        moon: "Moon in your {h_ord} house"
+        lun: {NEW: "New Moon", FULL: "Full Moon"}
+        ecl: {SOLAR: "Solar eclipse", LUNAR: "Lunar eclipse"}
+        in_house: "{name} in your {h_ord} house"
+        retro: "{t} retrograde in your {h_ord} house"
+        pm: "Progressed Moon {phrase}"
+        pm_key: "Progressed Moon: {cls} to your {dat}"
+        pmh: "Progressed Moon in your {h_ord} house"
+        pms: "Progressed Moon in {sign}"
+        contact: "near your {ins}"
+        cluster: "In your chart, {others} {verb} close to your {ins}: transiting {t} passes over them one after another, so the themes of these days add up."
+        cluster_verb: [sits, sit]
+        short: [[" in your ", " in the "], ["your ", ""]]
+        notes:
+          ecl: "An eclipse is a New or Full Moon close to the lunar nodes; traditionally its echo is felt for several months."
+          retro: "Retrograde motion is a planet's apparent backward movement as seen from Earth; traditionally it is a time to review and rework."
+          pm: "The progressed Moon is your natal Moon moved by the rule of one day of life for one year; it describes inner changes."
+          pmh: "The progressed Moon is your natal Moon moved by the rule of one day of life for one year; it describes inner changes."
+          pms: "The progressed Moon is your natal Moon moved by the rule of one day of life for one year; it describes inner changes."
+  # ---- строки, которые собирает сервер (отчёт, синтез, пометки «фон поколения»); {x_ord} — порядковое от {x}
+  strings:
+    ru:
+      and: " и "
+      house_n: "{n}-й дом"
+      ruler_of_n: "{n}-го"
+      rulers_meet: "В {h}-й дом сходятся управители {names} домов"
+      synth_evidence: "Об этом говорят: {list}"
+      synth_theme_mark: "сквозная тема: {pole}"
+      scope_generation_born: "Фон поколения: у всех, кто родился с {a} по {z}"
+      scope_generation_for: "Фон поколения: положение держится {dur}"
+      scope_season: "Общее для родившихся в один сезон: держится {dur}"
+      about: "около {n} {unit}"
+      about_day_and_half: "около полутора суток"
+      units: {hour: [часа, часов, часов], day: [дня, дней, дней], week: [недели, недель, недель],
+              month: [месяца, месяцев, месяцев], year: [года, лет, лет]}
+    en:
+      and: " and "
+      house_n: "{n_ord} house"
+      ruler_of_n: "{n_ord}"
+      rulers_meet: "Rulers of the {names} houses meet in the {h_ord} house"
+      synth_evidence: "Pointing to it: {list}"
+      synth_theme_mark: "recurring theme: {pole}"
+      scope_generation_born: "Generational background: shared by everyone born from {a} to {z}"
+      scope_generation_for: "Generational background: this placement lasts {dur}"
+      scope_season: "Shared by people born in the same season: lasts {dur}"
+      about: "about {n} {unit}"
+      about_day_and_half: "about a day and a half"
+      units: {hour: [hour, hours], day: [day, days], week: [week, weeks], month: [month, months], year: [year, years]}
+  # ---- цвета страницы: небо окрашивается картой человека — цветами знаков Солнца, Луны и Асцендента
+  # традиционные соответствия знаков и планет цветам; два тона на знак — для туманности и деталей;
+  # стихии — запасной цвет, если у знака нет своего
+  ui_palette:
+    anchors: [SUN, MOON, ASC]             # чьи знаки окрашивают небо (по порядку: самое крупное облако — первое)
+    accent_from: anchor                   # anchor — цвет знака первого тела из anchors; dominant — цвет ведущей планеты
+    tint: 0.22                            # насколько цвет первого знака окрашивает само небо (0 — только облака)
+    signs:
+      ARIES:       ["#FF4D3D", "#FF8A5C"]   # алый
+      TAURUS:      ["#4CC38A", "#F2A7C3"]   # изумрудный и розовый
+      GEMINI:      ["#FFD84D", "#FFB347"]   # жёлтый
+      CANCER:      ["#DDE6F5", "#8FB8E8"]   # серебро и жемчуг
+      LEO:         ["#FFB627", "#FF7F2A"]   # золото и оранжевый
+      VIRGO:       ["#8FB573", "#5C7FC4"]   # шалфей и тёмно-синий
+      LIBRA:       ["#F7A8D0", "#9CC8F5"]   # пастельные розовый и голубой
+      SCORPIO:     ["#D6336C", "#8E2D63"]   # тёмно-красный, бордо
+      SAGITTARIUS: ["#A06CFF", "#6F8BFF"]   # пурпур и фиолетовый
+      CAPRICORN:   ["#A0896B", "#6E8B74"]   # тёмно-коричневый и тёмно-зелёный
+      AQUARIUS:    ["#2FB8FF", "#3FE0D0"]   # электрик и бирюза
+      PISCES:      ["#4FD1B5", "#B9A5FF"]   # морская волна и лаванда
+    night: {deep: "#060918", sky: "#0F1533", star: "#ECEAFB", dust: "#9EA3C7", accent: "#BFAEFF", partner: "#F0A6E6"}   # partner — планеты второго человека в двойном круге
+    elements:
+      FIRE:  ["#FF7A45", "#FFC15E"]
+      EARTH: ["#6FBF73", "#C9A86A"]
+      AIR:   ["#7FD4FF", "#C3B5FF"]
+      WATER: ["#3E7BFF", "#2EC4B6"]
+    bodies:
+      SUN: "#FFC94A"
+      MOON: "#DCE3F2"
+      MERCURY: "#9FE3D0"
+      VENUS: "#F49AC2"
+      MARS: "#FF5A4E"
+      JUPITER: "#9A86FF"
+      SATURN: "#A9B0C6"
+      URANUS: "#3FE0FF"
+      NEPTUNE: "#5B8CFF"
+      PLUTO: "#D0457A"
+  allow_moshier: false       # без файлов эфемерид — ошибка, а не тихая деградация
+  pagerank:
+    alpha: 0.85
+    iters: 200
+    edge_sign_ruler: 1.0
+    edge_house_ruler: 0.5
+    edge_aspect: 0.6
+    dignity_coef: 0.06
+  calibration:
+    synthetic_charts: 3000
+    year_range: [1960, 2006]
+    lat_range: [-40.0, 62.0]
+    seed: 7
+    quantiles: 1001
+
+bodies:   # порядок задаёт раскладку эмбеддинга
+  - {code: SUN,     kind: planet, source: {se: 0},  weight: 1.0, label: {ru: Солнце, en: "Sun"}}
+  - {code: MOON,    kind: planet, source: {se: 1},  weight: 1.0, label: {ru: Луна, en: "Moon"}}
+  - {code: MERCURY, kind: planet, source: {se: 2},  weight: 0.7, label: {ru: Меркурий, en: "Mercury"}}
+  - {code: VENUS,   kind: planet, source: {se: 3},  weight: 0.8, label: {ru: Венера, en: "Venus"}}
+  - {code: MARS,    kind: planet, source: {se: 4},  weight: 0.8, label: {ru: Марс, en: "Mars"}}
+  - {code: JUPITER, kind: planet, source: {se: 5},  weight: 0.7, label: {ru: Юпитер, en: "Jupiter"}}
+  - {code: SATURN,  kind: planet, source: {se: 6},  weight: 0.7, label: {ru: Сатурн, en: "Saturn"}}
+  - {code: URANUS,  kind: planet, source: {se: 7},  weight: 0.5, label: {ru: Уран, en: "Uranus"}}
+  - {code: NEPTUNE, kind: planet, source: {se: 8},  weight: 0.4, label: {ru: Нептун, en: "Neptune"}}
+  - {code: PLUTO,   kind: planet, source: {se: 9},  weight: 0.5, label: {ru: Плутон, en: "Pluto"}}
+  - {code: RAHU,    kind: node,   source: {se: 11}, weight: 0.6, label: {ru: "Северный узел (Раху)", en: "North Node (Rahu)"}}   # 11 = TRUE_NODE
+  - {code: KETU,    kind: node,   source: {offset_of: RAHU, deg: 180}, weight: 0.5, label: {ru: "Южный узел (Кету)", en: "South Node (Ketu)"}}
+  - {code: LILITH,  kind: point,  source: {se: 12}, weight: 0.3, label: {ru: "Чёрная Луна (Лилит)", en: "Black Moon (Lilith)"}}  # 12 = MEAN_APOG
+  - {code: CHIRON,  kind: point,  source: {se: 15}, weight: 0.3, label: {ru: Хирон, en: "Chiron"}}
+  - {code: ASC,     kind: angle,  source: {angle: ASC}, weight: 0.9, needs_time: true, label: {ru: Асцендент, en: "Ascendant"}}
+  - {code: MC,      kind: angle,  source: {angle: MC},  weight: 0.8, needs_time: true, label: {ru: MC, en: "MC"}}
+
+signs:
+  - {idx: 0,  code: ARIES,       element: FIRE,  modality: CARDINAL, label: {ru: Овен, en: "Aries"}}
+  - {idx: 1,  code: TAURUS,      element: EARTH, modality: FIXED,    label: {ru: Телец, en: "Taurus"}}
+  - {idx: 2,  code: GEMINI,      element: AIR,   modality: MUTABLE,  label: {ru: Близнецы, en: "Gemini"}}
+  - {idx: 3,  code: CANCER,      element: WATER, modality: CARDINAL, label: {ru: Рак, en: "Cancer"}}
+  - {idx: 4,  code: LEO,         element: FIRE,  modality: FIXED,    label: {ru: Лев, en: "Leo"}}
+  - {idx: 5,  code: VIRGO,       element: EARTH, modality: MUTABLE,  label: {ru: Дева, en: "Virgo"}}
+  - {idx: 6,  code: LIBRA,       element: AIR,   modality: CARDINAL, label: {ru: Весы, en: "Libra"}}
+  - {idx: 7,  code: SCORPIO,     element: WATER, modality: FIXED,    label: {ru: Скорпион, en: "Scorpio"}}
+  - {idx: 8,  code: SAGITTARIUS, element: FIRE,  modality: MUTABLE,  label: {ru: Стрелец, en: "Sagittarius"}}
+  - {idx: 9,  code: CAPRICORN,   element: EARTH, modality: CARDINAL, label: {ru: Козерог, en: "Capricorn"}}
+  - {idx: 10, code: AQUARIUS,    element: AIR,   modality: FIXED,    label: {ru: Водолей, en: "Aquarius"}}
+  - {idx: 11, code: PISCES,      element: WATER, modality: MUTABLE,  label: {ru: Рыбы, en: "Pisces"}}
+
+houses:
+  - {num: 1,  class: angular,   label: {ru: "Личность, тело", en: "Self, body"}}
+  - {num: 2,  class: succedent, label: {ru: "Ресурсы, деньги", en: "Resources, money"}}
+  - {num: 3,  class: cadent,    label: {ru: "Речь, обмен", en: "Speech, exchange"}}
+  - {num: 4,  class: angular,   label: {ru: "Дом, род", en: "Home, roots"}}
+  - {num: 5,  class: succedent, label: {ru: "Творчество, роман", en: "Creativity, romance"}}
+  - {num: 6,  class: cadent,    label: {ru: "Труд, режим", en: "Work, routine"}}
+  - {num: 7,  class: angular,   label: {ru: "Партнёрство", en: "Partnership"}}
+  - {num: 8,  class: succedent, label: {ru: "Общие ресурсы, кризис", en: "Shared resources, crisis"}}
+  - {num: 9,  class: cadent,    label: {ru: "Мировоззрение, заграница", en: "Worldview, distant lands"}}
+  - {num: 10, class: angular,   label: {ru: "Призвание, статус", en: "Vocation, status"}}
+  - {num: 11, class: succedent, label: {ru: "Сообщества, будущее", en: "Communities, future"}}
+  - {num: 12, class: cadent,    label: {ru: "Скрытое, завершение", en: "The hidden, endings"}}
+
+house_class_weight: {angular: 1.6, succedent: 1.15, cadent: 0.85}
+
+rulerships:   # sign: [[body, role, weight], ...]
+  ARIES:       [[MARS, primary, 1.0]]
+  TAURUS:      [[VENUS, primary, 1.0]]
+  GEMINI:      [[MERCURY, primary, 1.0]]
+  CANCER:      [[MOON, primary, 1.0]]
+  LEO:         [[SUN, primary, 1.0]]
+  VIRGO:       [[MERCURY, primary, 1.0]]
+  LIBRA:       [[VENUS, primary, 1.0]]
+  SCORPIO:     [[PLUTO, primary, 1.0], [MARS, co, 0.5]]
+  SAGITTARIUS: [[JUPITER, primary, 1.0]]
+  CAPRICORN:   [[SATURN, primary, 1.0]]
+  AQUARIUS:    [[URANUS, primary, 1.0], [SATURN, co, 0.5]]
+  PISCES:      [[NEPTUNE, primary, 1.0], [JUPITER, co, 0.5]]
+
+dignities:    # [body, sign, kind, score]
+  - [SUN, LEO, DOMICILE, 5]
+  - [SUN, ARIES, EXALTATION, 4]
+  - [SUN, AQUARIUS, DETRIMENT, -5]
+  - [SUN, LIBRA, FALL, -4]
+  - [MOON, CANCER, DOMICILE, 5]
+  - [MOON, TAURUS, EXALTATION, 4]
+  - [MOON, CAPRICORN, DETRIMENT, -5]
+  - [MOON, SCORPIO, FALL, -4]
+  - [MERCURY, GEMINI, DOMICILE, 5]
+  - [MERCURY, VIRGO, DOMICILE, 5]
+  - [MERCURY, SAGITTARIUS, DETRIMENT, -5]
+  - [MERCURY, PISCES, DETRIMENT, -5]
+  - [VENUS, TAURUS, DOMICILE, 5]
+  - [VENUS, LIBRA, DOMICILE, 5]
+  - [VENUS, PISCES, EXALTATION, 4]
+  - [VENUS, SCORPIO, DETRIMENT, -5]
+  - [VENUS, ARIES, DETRIMENT, -5]
+  - [VENUS, VIRGO, FALL, -4]
+  - [MARS, ARIES, DOMICILE, 5]
+  - [MARS, SCORPIO, DOMICILE, 5]
+  - [MARS, CAPRICORN, EXALTATION, 4]
+  - [MARS, LIBRA, DETRIMENT, -5]
+  - [MARS, TAURUS, DETRIMENT, -5]
+  - [MARS, CANCER, FALL, -4]
+  - [JUPITER, SAGITTARIUS, DOMICILE, 5]
+  - [JUPITER, PISCES, DOMICILE, 5]
+  - [JUPITER, CANCER, EXALTATION, 4]
+  - [JUPITER, GEMINI, DETRIMENT, -5]
+  - [JUPITER, VIRGO, DETRIMENT, -5]
+  - [JUPITER, CAPRICORN, FALL, -4]
+  - [SATURN, CAPRICORN, DOMICILE, 5]
+  - [SATURN, AQUARIUS, DOMICILE, 5]
+  - [SATURN, LIBRA, EXALTATION, 4]
+  - [SATURN, CANCER, DETRIMENT, -5]
+  - [SATURN, LEO, DETRIMENT, -5]
+  - [SATURN, ARIES, FALL, -4]
+  - [URANUS, AQUARIUS, DOMICILE, 5]
+  - [URANUS, LEO, DETRIMENT, -5]
+  - [NEPTUNE, PISCES, DOMICILE, 5]
+  - [NEPTUNE, VIRGO, DETRIMENT, -5]
+  - [PLUTO, SCORPIO, DOMICILE, 5]
+  - [PLUTO, TAURUS, DETRIMENT, -5]
+
+aspects:      # orb_deg — классический орбис; ядро затухает до orb_floor на его границе
+  - {code: CONJ, angle: 0,   orb: 8, weight: 1.0,  label: {ru: Соединение, en: "Conjunction"}}
+  - {code: OPP,  angle: 180, orb: 8, weight: 0.9,  label: {ru: Оппозиция, en: "Opposition"}}
+  - {code: TRI,  angle: 120, orb: 7, weight: 0.8,  label: {ru: Тригон, en: "Trine"}}
+  - {code: SQR,  angle: 90,  orb: 7, weight: 0.85, label: {ru: Квадрат, en: "Square"}}
+  - {code: SXT,  angle: 60,  orb: 5, weight: 0.6,  label: {ru: Секстиль, en: "Sextile"}}
+
+aspect_exclude_pairs:   # геометрически фиксированные пары
+  - [RAHU, KETU]
+
+# Каналы 1..10. Якоря из методологии: Уран = 8 (Шут 0), Плутон = 10 (Суд XX) —
+# совпадают со стандартным порядком планет. Остальное — ДОЛЖНО быть сверено
+# с первоисточником (verified: false), прежде чем на это опираться.
+channels:
+  - {body: SUN,     channel: 1,  verified: false}
+  - {body: MOON,    channel: 2,  verified: false}
+  - {body: MERCURY, channel: 3,  verified: false}
+  - {body: VENUS,   channel: 4,  verified: false}
+  - {body: MARS,    channel: 5,  verified: false}
+  - {body: JUPITER, channel: 6,  verified: false}
+  - {body: SATURN,  channel: 7,  verified: false}
+  - {body: URANUS,  channel: 8,  verified: false, arcana: "Шут 0"}
+  - {body: NEPTUNE, channel: 9,  verified: false}
+  - {body: PLUTO,   channel: 10, verified: false, arcana: "Суд XX"}
+
+fact_templates:   # человекочитаемые заголовки фактов (UI и промпты контента)
+  ru:
+    sign: "{body} в знаке {sign}"
+    house: "{body} в {house}-м доме"
+    aspect: "{a} — {aspect} — {b}"
+    dignity: "{body}: {kind}"
+    ruler: "Управитель {h}-го дома в {h2}-м доме"
+    channel_top: "Доминирующий канал {n}"
+    final: "{body} — конечный диспозитор карты"
+    reception: "Взаимная рецепция: {a} и {b}"
+    rule: "Паттерн {key}"
+    dominant: "Ведущие силы карты: {a} и {b}"
+    element: "{level} стихии: {name}"
+    modality: "{level} креста: {name}"
+    synth_tension: "Напряжение — {axis}"
+    synth_theme: "Сквозная тема — {pole}"
+  en:                           # {x_ord} — порядковое числительное от {x}: 1st, 2nd, 3rd …
+    sign: "{body} in {sign}"
+    house: "{body} in the {house_ord} house"
+    aspect: "{a} — {aspect} — {b}"
+    dignity: "{body}: {kind}"
+    ruler: "Ruler of the {h_ord} house in the {h2_ord} house"
+    channel_top: "Dominant channel {n}"
+    final: "{body} is the final dispositor of the chart"
+    reception: "Mutual reception: {a} and {b}"
+    rule: "Pattern {key}"
+    dominant: "Leading forces of the chart: {a} and {b}"
+    element: "{name} element: {level}"
+    modality: "{name} modality: {level}"
+    synth_tension: "Tension — {axis}"
+    synth_theme: "Recurring theme — {pole}"
+dignity_labels:
+  ru: {DOMICILE: обитель, EXALTATION: экзальтация, DETRIMENT: изгнание, FALL: падение}
+  en: {DOMICILE: domicile, EXALTATION: exaltation, DETRIMENT: detriment, FALL: fall}
+element_labels:
+  ru: {FIRE: Огонь, EARTH: Земля, AIR: Воздух, WATER: Вода}
+  en: {FIRE: Fire, EARTH: Earth, AIR: Air, WATER: Water}
+modality_labels:
+  ru: {CARDINAL: кардинальный, FIXED: фиксированный, MUTABLE: мутабельный}
+  en: {CARDINAL: Cardinal, FIXED: Fixed, MUTABLE: Mutable}
+level_labels:
+  ru: {high: Перевес, low: Недостаток}
+  en: {high: dominant, low: lacking}
+
+report_modules:   # порядок важен: факт уходит в первый подходящий модуль (kinds -> тела -> дома; «планета в доме» — сначала дом,
+                  # кроме модулей из params.report_body_first: там тело важнее дома — узлы, Лилит и Хирон остаются в «Карме»)
+  - {code: overview, label: {ru: "Главное в карте", en: "Chart highlights"}, kinds: [dominant, element, modality]}
+  - {code: karma,  label: {ru: "Карма и задача воплощения", en: "Karma and life task"}, bodies: [RAHU, KETU, LILITH, CHIRON], houses: [12]}
+  - {code: core,   label: {ru: "Ядро личности", en: "Core of the personality"},             bodies: [SUN, MOON, ASC], houses: [1]}
+  - {code: love,   label: {ru: "Близость и обмен", en: "Intimacy and exchange"},          bodies: [VENUS, MARS], houses: [5, 7, 8]}
+  - {code: career, label: {ru: "Работа, деньги, мандат", en: "Work, money, mandate"},    bodies: [SATURN, JUPITER, MC], houses: [2, 6, 10]}
+  - {code: mind,   label: {ru: "Мышление и среда", en: "Mind and surroundings"},          bodies: [MERCURY, URANUS, NEPTUNE], houses: [3, 9, 11]}
+  - {code: depth,  label: {ru: "Глубина и трансформация", en: "Depth and transformation"},   bodies: [PLUTO], houses: [4]}
+
+# ---------------- Синастрия (априор) ----------------
+# Направление: receiver (A) получает от sender (B). Пара [X, Y] значит
+# "планета X получателя — планета Y отправителя". symmetric: true добавляет [Y, X].
+aspect_profiles:
+  harmonious: {CONJ: 1.0, TRI: 0.8, SXT: 0.6, OPP: 0.2, SQR: -0.2}
+  intense:    {CONJ: 1.0, OPP: 0.8, SQR: 0.7, TRI: 0.5, SXT: 0.4}
+  binding:    {CONJ: 1.0, TRI: 0.6, SXT: 0.5, OPP: -0.3, SQR: -0.6}
+  contact:    {CONJ: 1.0, TRI: 0.5, SXT: 0.4, OPP: 0.3, SQR: 0.0}
+
+synastry_dimensions:
+  attraction:
+    label: {ru: "Влечение", en: "Attraction"}
+    pairs:
+      - {pair: [VENUS, MARS],  w: 1.0, profile: intense, symmetric: true}
+      - {pair: [VENUS, PLUTO], w: 0.7, profile: intense, symmetric: true}
+      - {pair: [MARS, PLUTO],  w: 0.5, profile: intense, symmetric: true}
+      - {pair: [SUN, VENUS],   w: 0.5, profile: intense, symmetric: true}
+      - {pair: [MOON, MARS],   w: 0.5, profile: intense, symmetric: true}
+      - {pair: [VENUS, LILITH], w: 0.4, profile: intense, symmetric: true}
+      - {pair: [MARS, LILITH], w: 0.4, profile: intense, symmetric: true}
+      - {pair: [ASC, VENUS],   w: 0.5, profile: intense, symmetric: true}
+      - {pair: [ASC, MARS],    w: 0.5, profile: intense, symmetric: true}
+      - {pair: [MARS, MARS],   w: 0.3, profile: intense}
+    overlays:   # [тело отправителя, дом получателя, вес]
+      - [VENUS, 5, 0.6]
+      - [VENUS, 8, 0.5]
+      - [MARS, 5, 0.5]
+      - [MARS, 8, 0.6]
+      - [MARS, 1, 0.3]
+      - [PLUTO, 8, 0.4]
+      - [SUN, 5, 0.3]
+  bond:
+    label: {ru: "Совместимость и устойчивость", en: "Compatibility and stability"}
+    pairs:
+      - {pair: [SUN, MOON],     w: 1.0, profile: harmonious, symmetric: true}
+      - {pair: [MOON, MOON],    w: 0.7, profile: harmonious}
+      - {pair: [MOON, VENUS],   w: 0.7, profile: harmonious, symmetric: true}
+      - {pair: [VENUS, VENUS],  w: 0.5, profile: harmonious}
+      - {pair: [SUN, SUN],      w: 0.3, profile: harmonious}
+      - {pair: [MOON, MERCURY], w: 0.3, profile: harmonious, symmetric: true}
+      - {pair: [SUN, JUPITER],  w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [MOON, JUPITER], w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [VENUS, JUPITER], w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [ASC, SUN],      w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [ASC, MOON],     w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [SUN, SATURN],   w: 0.5, profile: binding, symmetric: true}
+      - {pair: [MOON, SATURN],  w: 0.6, profile: binding, symmetric: true}
+      - {pair: [VENUS, SATURN], w: 0.6, profile: binding, symmetric: true}
+    overlays:
+      - [SUN, 7, 0.5]
+      - [SUN, 4, 0.3]
+      - [MOON, 4, 0.5]
+      - [MOON, 7, 0.4]
+      - [VENUS, 7, 0.5]
+      - [JUPITER, 7, 0.4]
+      - [JUPITER, 4, 0.3]
+      - [SATURN, 7, 0.3]
+  growth:
+    label: {ru: "Кармический катализатор", en: "Karmic catalyst"}
+    pairs:   # асимметрично: планета отправителя на узле получателя
+      - {pair: [RAHU, SUN],     w: 1.0, profile: contact}
+      - {pair: [RAHU, MOON],    w: 0.9, profile: contact}
+      - {pair: [RAHU, VENUS],   w: 0.8, profile: contact}
+      - {pair: [RAHU, JUPITER], w: 0.6, profile: contact}
+      - {pair: [RAHU, MERCURY], w: 0.4, profile: contact}
+      - {pair: [KETU, SUN],     w: -0.3, profile: contact}
+      - {pair: [KETU, MOON],    w: -0.3, profile: contact}
+      - {pair: [SUN, SATURN],   w: 0.3, profile: contact}
+      - {pair: [MOON, SATURN],  w: 0.3, profile: contact}
+      - {pair: [SUN, PLUTO],    w: 0.4, profile: contact}
+      - {pair: [VENUS, PLUTO],  w: 0.3, profile: contact}
+    overlays:
+      - [RAHU, 1, 0.4]
+      - [RAHU, 7, 0.4]
+      - [SUN, 9, 0.3]
+      - [JUPITER, 9, 0.3]
+  work:
+    label: {ru: "Дело и масштаб", en: "Business and scale"}
+    pairs:
+      - {pair: [SUN, SATURN],     w: 0.6, profile: binding, symmetric: true}
+      - {pair: [MERCURY, SATURN], w: 0.5, profile: binding, symmetric: true}
+      - {pair: [SUN, JUPITER],    w: 0.6, profile: harmonious, symmetric: true}
+      - {pair: [MC, JUPITER],     w: 0.6, profile: harmonious, symmetric: true}
+      - {pair: [MC, SUN],         w: 0.6, profile: harmonious, symmetric: true}
+      - {pair: [MERCURY, MARS],   w: 0.4, profile: harmonious, symmetric: true}
+      - {pair: [MERCURY, MERCURY], w: 0.5, profile: harmonious}
+      - {pair: [JUPITER, SATURN], w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [MARS, SATURN],    w: 0.3, profile: binding, symmetric: true}
+      - {pair: [SUN, MARS],       w: 0.4, profile: intense, symmetric: true}
+    overlays:
+      - [SUN, 10, 0.6]
+      - [SUN, 2, 0.3]
+      - [SUN, 6, 0.3]
+      - [JUPITER, 2, 0.5]
+      - [JUPITER, 10, 0.5]
+      - [SATURN, 10, 0.4]
+      - [SATURN, 6, 0.3]
+      - [MARS, 10, 0.3]
+      - [MARS, 6, 0.3]
+      - [MERCURY, 3, 0.3]
+      - [MERCURY, 6, 0.3]
+  mind:
+    label: {ru: "Ментальный резонанс", en: "Mental resonance"}
+    pairs:
+      - {pair: [MERCURY, MERCURY], w: 1.0, profile: harmonious}
+      - {pair: [MERCURY, URANUS],  w: 0.6, profile: harmonious, symmetric: true}
+      - {pair: [MERCURY, JUPITER], w: 0.7, profile: harmonious, symmetric: true}
+      - {pair: [MERCURY, SUN],     w: 0.5, profile: harmonious, symmetric: true}
+      - {pair: [MERCURY, MOON],    w: 0.4, profile: harmonious, symmetric: true}
+      - {pair: [SUN, URANUS],      w: 0.3, profile: harmonious, symmetric: true}
+      - {pair: [JUPITER, JUPITER], w: 0.3, profile: harmonious}
+    overlays:
+      - [MERCURY, 3, 0.4]
+      - [MERCURY, 9, 0.4]
+      - [MERCURY, 11, 0.5]
+      - [SUN, 11, 0.5]
+      - [SUN, 9, 0.3]
+      - [JUPITER, 9, 0.4]
+      - [JUPITER, 11, 0.4]
+      - [URANUS, 11, 0.3]
+
+search_modes:
+  - {code: ROMANCE,   label: {ru: "Отношения", en: "Relationships"}, nash_lambda: 1.0,
+     dims: {attraction: 0.30, bond: 0.45, growth: 0.25}}
+  - {code: COFOUNDER, label: {ru: "Дело и масштаб", en: "Business and scale"}, nash_lambda: 1.0,
+     dims: {work: 0.55, bond: 0.15, mind: 0.15, growth: 0.15}}
+  - {code: COMMUNITY, label: {ru: "Работа и команда", en: "Work and team"}, nash_lambda: 0.6,
+     dims: {mind: 0.60, bond: 0.25, growth: 0.15}}
+
+# ---------------- Составные правила (DSL) ----------------
+# Атомарные факты (планета в знаке/доме, аспект, достоинство, управитель дома в
+# доме) генерируются автоматически из карты; здесь — только составные паттерны.
+# Тексты к правилам и фактам живут в таблице content (status draft/approved).
+# covers: атомарные факты (маски), которые правило поглощает — при срабатывании
+# они не дублируются в отчёте.
+rules:
+  - key: CHART_RULER_ANGULAR
+    label: {ru: "Управитель карты в угловом доме", en: "Chart ruler in an angular house"}
+    covers: ["ruler:1:in:*"]
+    presents: covered      # показывать текст своего варианта (поглощённого факта этой карты)
+    module: core
+    concept: chart_ruler_strength
+    priority: 1.4
+    when: {in_house: {body: {ruler_of_house: 1}, houses: [1, 4, 7, 10]}}
+  - key: RULER2_IN_8_OR_12
+    label: {ru: "Управитель 2-го дома в 8-м или 12-м доме", en: "Ruler of the 2nd house in the 8th or 12th house"}
+    covers: ["ruler:2:in:*"]
+    presents: covered      # показывать текст своего варианта (поглощённого факта этой карты)
+    module: career
+    concept: money_via_shared_or_hidden
+    priority: 1.5
+    when: {in_house: {body: {ruler_of_house: 2}, houses: [8, 12]}}
+  - key: RULER10_IN_ANGLE
+    label: {ru: "Управитель 10-го дома в угловом доме", en: "Ruler of the 10th house in an angular house"}
+    covers: ["ruler:10:in:*"]
+    presents: covered      # показывать текст своего варианта (поглощённого факта этой карты)
+    module: career
+    concept: career_visibility
+    priority: 1.3
+    when: {in_house: {body: {ruler_of_house: 10}, houses: [1, 4, 7, 10]}}
+  - key: SATURN_PLUTO_ON_ASC
+    label: {ru: "Соединение Сатурна и Плутона на Асценденте", en: "Saturn–Pluto conjunction on the Ascendant"}
+    covers: ["aspect:SATURN:CONJ:PLUTO", "aspect:SATURN:CONJ:ASC", "aspect:PLUTO:CONJ:ASC"]
+    module: core
+    concept: power_on_asc
+    priority: 2.0
+    when:
+      all:
+        - {aspect: {a: SATURN, b: PLUTO, kinds: [CONJ], min: 0.3}}
+        - any:
+            - {aspect: {a: SATURN, b: ASC, kinds: [CONJ], min: 0.3}}
+            - {aspect: {a: PLUTO, b: ASC, kinds: [CONJ], min: 0.3}}
+  - key: NODE_ON_LIGHT
+    label: {ru: "Лунный узел на светиле", en: "Lunar node on a luminary"}
+    covers: ["aspect:SUN:*:RAHU", "aspect:MOON:*:RAHU", "aspect:SUN:*:KETU", "aspect:MOON:*:KETU"]
+    presents: covered      # показывать текст своего варианта (поглощённого факта этой карты)
+    module: karma
+    concept: node_contact_light
+    priority: 1.6
+    when:
+      any:
+        - {aspect: {a: RAHU, b: SUN, kinds: [CONJ, OPP], min: 0.4}}
+        - {aspect: {a: RAHU, b: MOON, kinds: [CONJ, OPP], min: 0.4}}
+  - key: STELLIUM_SIGN
+    label: {ru: "Стеллиум в знаке", en: "Stellium in a sign"}
+    module: core
+    concept: stellium
+    priority: 1.2
+    when: {stellium: {by: sign}}
+  - key: VENUS_CHANNEL_$N       # шаблон: развернётся в 10 правил
+    label: {ru: "Канал Венеры $N (по диспозитору)", en: "Venus channel $N (by dispositor)"}
+    foreach: {N: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+    module: love
+    concept: venus_channel
+    priority: 1.8
+    when: {channel: {of: {dispositor: VENUS}, eq: $N}}

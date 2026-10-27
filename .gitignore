@@ -1,0 +1,11 @@
+# Texts of the report and the forecast are a separate, proprietary work: they are never committed.
+content/
+doctrine/prompts/
+# local settings, caches, screenshots
+.env
+deploy.log
+__pycache__/
+.pytest_cache/
+*.pyc
+*.png
+!app/static/**/*.png

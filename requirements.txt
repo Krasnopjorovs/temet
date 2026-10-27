@@ -1,0 +1,12 @@
+pyswisseph==2.10.3.2
+numpy==2.5.4
+fastapi==0.156.2
+uvicorn==0.54.0
+pydantic==2.14.1
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
+pgvector==0.5.1
+tzdata==2026.5
+PyYAML==6.0.3
+pymorphy3==2.0.6
+pymorphy3-dicts-ru==2.4.417150.4580142

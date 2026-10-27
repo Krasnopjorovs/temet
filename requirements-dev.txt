@@ -1,0 +1,4 @@
+# только для проверки текстов и тестов (в образ сайта не входит)
+-r requirements.txt
+pytest==9.1.1
+snowballstemmer==3.0.1
