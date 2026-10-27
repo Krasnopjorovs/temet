@@ -183,3 +183,8 @@
   .card-head h2 { margin: 0; }
   .card-head .close { padding: 6px 14px; font-size: 13px; }
   button.ghost.on { background: var(--soft); color: var(--fg); }
+  /* переключатель языка — ссылки (у каждой страницы свой адрес на каждом языке) */
+  .seg.lang a { padding: 4px 12px; border-radius: 999px; color: var(--mute); text-decoration: none;
+                font: 500 13px/1.2 var(--display); letter-spacing: .02em; }
+  .seg.lang a.on { background: var(--soft); color: var(--fg); }
+  .seg.lang a:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }

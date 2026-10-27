@@ -55,8 +55,6 @@
 I18N.apply();
 I18N.switcher(document.querySelector("[data-lang-switch]"));
 const LANG = I18N.lang;
-// ссылки на страницу «Как это работает» — на том же языке
-document.querySelectorAll('a[href^="/about"]').forEach(a => { a.href = a.getAttribute("href").replace(/^\/about/, `/about?lang=${LANG}`); });
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const Q = new URLSearchParams(location.search);
@@ -203,7 +201,7 @@ async function calc() {
     const sky = paintSky(c);
     $("out").innerHTML = `
       <section class="wheel-wrap" aria-label="${esc(t("wheel_aria"))}">${wheel}${sky ? skyNote(sky) : ""}
-        <p class="note center"><a href="/about?lang=${LANG}#wheel">${esc(t("wheel_link"))}</a></p>
+        <p class="note center"><a href="${I18N.url("about")}#wheel">${esc(t("wheel_link"))}</a></p>
         ${notes.length ? `<p class="note center">${notes.map(esc).join("<br>")}</p>` : ""}</section>
       ${mods}
       <div class="card"><details><summary>${esc(t("tech"))}</summary>
@@ -385,11 +383,11 @@ function forecastHtml(f, c) {
       ${hidden.length ? `<details class="more"><summary>${esc(t("more_events", { n: hidden.length }))}</summary>${hidden.map(row).join("")}</details>` : ""}</div>
     <div class="legend-row"><span style="--c:var(--harm)"><i></i>${esc(t("lg_harm"))}</span><span style="--c:var(--tense)"><i></i>${esc(t("lg_tense"))}</span><span style="--c:var(--acc)"><i></i>${esc(t("lg_conj"))}</span><span style="--c:var(--mute)"><i></i>${esc(t("lg_house"))}</span><span style="--c:var(--partner)"><i style="background:repeating-linear-gradient(90deg,var(--c) 0 5px,transparent 5px 8px)"></i>${esc(t("lg_retro"))}</span><span>${esc(t("lg_exact"))}</span><span>${esc(t("lg_station"))}</span></div>
     <details class="more howto"><summary>${esc(t("howto"))}</summary>
-      ${t("howto_html").replace(/href="\/about/g, `href="/about?lang=${LANG}`)}
+      ${t("howto_html").replace(/href="\/about/g, `href="${I18N.url("about")}`)}
     </details>
     ${moon}
     <h3 class="sec">${esc(t("sky_period"))}</h3>
-    <div class="wheel-wrap">${wheel}<p class="note center"><a href="/about?lang=${LANG}#wheel">${esc(t("wheel_link"))}</a></p></div>
+    <div class="wheel-wrap">${wheel}<p class="note center"><a href="${I18N.url("about")}#wheel">${esc(t("wheel_link"))}</a></p></div>
     ${bg}
     <p class="note center">${esc(tzNote)}</p>
   </section>`;

@@ -393,3 +393,16 @@ def test_locales_complete_and_english_titles():
         for fld in ("title", "short", "note"):
             assert not cyr.search(it.get(fld) or ""), (fld, it.get(fld))
     assert not cyr.search(f["intensity"]["label"] or "")
+
+
+def test_pages_rendered_per_language():
+    """каждая страница на каждом языке: слова подставлены сервером, есть canonical, hreflang и описание"""
+    import re
+    from app.main import LANGS, RENDERED, SITE, page_path
+    for (page, lang), html in RENDERED.items():
+        assert f'<html lang="{lang}"' in html
+        assert not re.search(r'data-i18n="\w+"[^>]*>\s*</', html), (page, lang)       # пустых подписей нет
+        assert f'<link rel="canonical" href="{SITE}{page_path(page, lang)}">' in html
+        assert html.count('rel="alternate" hreflang=') == len(LANGS) + 1
+        assert re.search(r'<meta name="description" content="[^"]{50,}">', html)
+    assert set(RENDERED) == {(p, l) for p in ("index", "about") for l in LANGS}

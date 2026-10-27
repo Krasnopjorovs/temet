@@ -32,7 +32,10 @@ aspect kernels, D = 1552), so pgvector can search for matches with the same quan
 uncertainty enters exactly through a sinc factor.
 
 Languages: labels come from the doctrine (`label: {ru: …, en: …}`), server-built strings from
-`params.strings.<lang>`, page words from `app/static/i18n.js`; texts are stored per language.
+`params.strings.<lang>`, page words from `app/i18n/<lang>.json`; texts are stored per language. Every page has its
+own address per language (`/`, `/about` in Russian; `/en/`, `/en/about` in English) and is rendered on the server
+with its words, title, description, canonical and `hreflang` links, Open Graph tags and JSON-LD; `/sitemap.xml` and
+`/robots.txt` are generated from the same list.
 
 ## Run
 
@@ -50,6 +53,10 @@ text is not written yet. To add your own texts, write JSON files (`key`, `title`
 
 `GET /api/doctrine` lists the key space; `python -m scripts.gate_content` checks Russian texts and
 `python -m scripts.gate_translation` checks translations against their source (`requirements-dev.txt`).
+
+Settings in `.env`: `PUBLIC_URL` (the public address used in canonical links and the sitemap), `RATE_LIMIT`
+(API requests per minute per visitor, default 120), `DRAFTS_NETS` (networks that may see unapproved texts; requests
+through a proxy or tunnel never do), `API_BIND`, `API_PORT`, `ENABLE_NETWORK`.
 
 Tests: `pip install -r requirements-dev.txt && pytest tests/`. Engine checks: `python -m scripts.verify_engine`.
 

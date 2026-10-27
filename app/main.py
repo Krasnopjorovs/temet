@@ -3,17 +3,19 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import json
 import os
 import re
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
+from html import escape as html_escape
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -282,28 +284,158 @@ def _versioned(page: str) -> str:
 
 PAGES = {p.name: _versioned(p.name) for p in (Path(__file__).parent / "static").glob("*.html")}
 
+# ---------------------------------------------------------------- страницы: язык в адресе, разметка для поисковиков
+# Слова страниц — app/i18n/<язык>.json. Адреса: основной язык — «/», «/about»; остальные — «/en/», «/en/about».
+# Сервер сам подставляет слова в разметку, заголовок, описание, canonical, hreflang, Open Graph и JSON-LD,
+# поэтому поисковик видит готовую страницу на нужном языке, а скрипты только оживляют её.
+DICTS = {f.stem: json.loads(f.read_text(encoding="utf-8")) for f in sorted((Path(__file__).parent / "i18n").glob("*.json"))}
+BASE_LANG = i18n.DEFAULT
+LANGS = [BASE_LANG] + [l for l in DICTS if l != BASE_LANG]
+SITE = os.environ.get("PUBLIC_URL", "https://temet.artjoms.ai").rstrip("/")
+SITE_PAGES = {"index": ("seo_title", "seo_desc"), "about": ("about_title", "about_desc")}   # страница: (заголовок, описание)
 
-def _page_lang(request: Request, lang: str | None) -> str:
-    """язык страницы: ?lang=, иначе выбор на сайте (cookie temet_lang), иначе язык браузера"""
-    loc = lang or request.cookies.get("temet_lang") or request.cookies.get("neoastro_lang")
-    if not loc:
-        loc = (request.headers.get("accept-language") or "").split(",")[0]
-    return i18n.norm(loc, _rt().d)
+
+def page_path(page: str, lang: str) -> str:
+    return ("/" if lang == BASE_LANG else f"/{lang}/") + ("" if page == "index" else page)
 
 
-def _page(name: str, request: Request, lang: str | None) -> HTMLResponse:
-    """about.html — язык по умолчанию; about.en.html — английская версия той же страницы"""
-    loc = _page_lang(request, lang)
-    stem, ext = name.rsplit(".", 1)
-    html = PAGES.get(f"{stem}.{loc}.{ext}") or PAGES[name]
-    return HTMLResponse(html, headers={"Cache-Control": "no-cache", "Vary": "Cookie, Accept-Language"})
+def _page_file(page: str, lang: str) -> str:
+    return f"{page}.{lang}.html" if f"{page}.{lang}.html" in PAGES else f"{page}.html"
+
+
+def _fill(html: str, d: dict) -> str:
+    """data-i18n — текст элемента, data-i18n-html — разметка, data-i18n-attr="атрибут:ключ,…" — атрибуты"""
+    esc = lambda v: html_escape(str(v), quote=True)
+    html = re.sub(r'(<([a-zA-Z0-9]+)\b[^>]*\sdata-i18n="(\w+)"[^>]*>)\s*(</\2>)',
+                  lambda m: m.group(1) + esc(d.get(m.group(3), "")) + m.group(4), html)
+    html = re.sub(r'(<([a-zA-Z0-9]+)\b[^>]*\sdata-i18n-html="(\w+)"[^>]*>)\s*(</\2>)',
+                  lambda m: m.group(1) + str(d.get(m.group(3), "")) + m.group(4), html)
+    return re.sub(r'data-i18n-attr="([^"]+)"', lambda m: m.group(0) + "".join(
+        f' {a.strip()}="{esc(d.get(k.strip(), ""))}"' for a, k in (x.split(":") for x in m.group(1).split(","))), html)
+
+
+def _seo_head(page: str, lang: str, d: dict) -> str:
+    esc = lambda v: html_escape(str(v), quote=True)
+    title, desc = (d.get(k, "") for k in SITE_PAGES[page])
+    url = SITE + page_path(page, lang)
+    alt = "".join(f'\n<link rel="alternate" hreflang="{l}" href="{SITE}{page_path(page, l)}">' for l in LANGS)
+    site = {"@type": "WebSite", "name": d.get("site_name"), "url": SITE + "/", "inLanguage": LANGS}
+    if page == "index":
+        ld = {"@context": "https://schema.org", "@type": "WebApplication", "name": d.get("site_name"), "url": url,
+              "description": desc, "inLanguage": lang, "applicationCategory": "LifestyleApplication",
+              "operatingSystem": "Any", "isAccessibleForFree": True, "isPartOf": site,
+              "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CHF"}}
+    else:
+        ld = {"@context": "https://schema.org", "@type": "WebPage", "name": title, "url": url,
+              "description": desc, "inLanguage": lang, "isPartOf": site}
+    return (f'<title>{esc(title)}</title>\n<meta name="description" content="{esc(desc)}">\n'
+            f'<link rel="canonical" href="{url}">{alt}\n'
+            f'<link rel="alternate" hreflang="x-default" href="{SITE}{page_path(page, BASE_LANG)}">\n'
+            f'<meta property="og:type" content="website">\n<meta property="og:site_name" content="{esc(d.get("site_name", ""))}">\n'
+            f'<meta property="og:title" content="{esc(title)}">\n<meta property="og:description" content="{esc(desc)}">\n'
+            f'<meta property="og:url" content="{url}">\n<meta property="og:locale" content="{esc(d.get("og_locale", lang))}">\n'
+            f'<meta property="og:image" content="{SITE}/static/og.png">\n'
+            f'<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n'
+            f'<meta property="og:image:alt" content="{esc(d.get("og_alt", ""))}">\n'
+            f'<meta name="twitter:card" content="summary_large_image">\n<meta name="theme-color" content="#060918">\n'
+            f'<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">\n'
+            f'<link rel="icon" href="/favicon.ico" sizes="32x32">\n<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">\n'
+            f'<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")}</script>')
+
+
+def render_page(page: str, lang: str) -> str:
+    d = {**DICTS.get(BASE_LANG, {}), **DICTS.get(lang, {})}
+    html = PAGES[_page_file(page, lang)]
+    html = re.sub(r'<html lang="[^"]*"', f'<html lang="{lang}"', html, count=1)
+    html = re.sub(r"<title>.*?</title>", lambda m: _seo_head(page, lang, d), html, count=1, flags=re.S)
+    html = _fill(html, d)
+    if lang != BASE_LANG:          # внутренние ссылки — на страницы этого языка
+        for p in SITE_PAGES:
+            html = html.replace(f'href="{page_path(p, BASE_LANG)}"', f'href="{page_path(p, lang)}"')
+            html = re.sub(rf'href="{re.escape(page_path(p, BASE_LANG))}([#?])', rf'href="{page_path(p, lang)}\1', html) if p != "index" else html
+    boot = {"I18N_LANG": lang, "I18N_BASE": BASE_LANG, "I18N_LANGS": LANGS,
+            "I18N_NAMES": {l: DICTS[l].get("lang_name", l) for l in LANGS},
+            "I18N_DATA": {lang: d}}          # слова этого языка, недостающие — из основного
+    script = "<script>" + "".join(f"window.{k}={json.dumps(v, ensure_ascii=False).replace('</', '<\\/')};" for k, v in boot.items()) + "</script>\n"
+    return html.replace('<script src="/static/i18n.js', script + '<script src="/static/i18n.js', 1)
+
+
+RENDERED = {(p, l): render_page(p, l) for p in SITE_PAGES for l in LANGS}
+
+
+def _preferred(request: Request) -> str | None:
+    """язык, который посетитель выбрал на сайте (cookie), иначе первый знакомый язык браузера"""
+    c = request.cookies.get("temet_lang") or request.cookies.get("neoastro_lang")
+    if c in DICTS:
+        return c
+    langs = []
+    for part in (request.headers.get("accept-language") or "").split(","):
+        tag, _, q = part.strip().partition(";q=")
+        try:
+            langs.append((float(q or 1), tag.split("-")[0].lower()))
+        except ValueError:
+            continue
+    return next((l for _, l in sorted(langs, key=lambda x: -x[0]) if l in DICTS), None)
+
+
+def _serve(page: str, lang: str, request: Request, negotiate: bool) -> Response:
+    q = request.query_params.get("lang")
+    if q in DICTS:                                   # старые ссылки «?lang=en» — на адрес языка
+        return RedirectResponse(page_path(page, q), status_code=301)
+    if negotiate and (p := _preferred(request)) and p != lang:
+        r = RedirectResponse(page_path(page, p), status_code=302)
+        r.headers["Vary"] = "Cookie, Accept-Language"
+        return r
+    return HTMLResponse(RENDERED[(page, lang)], headers={"Cache-Control": "no-cache", "Vary": "Cookie, Accept-Language"})
 
 
 @app.get("/")
-def index(request: Request, lang: str | None = None):
-    return _page("index.html", request, lang)
+def index(request: Request):
+    return _serve("index", BASE_LANG, request, negotiate=True)
 
 
 @app.get("/about")
-def about(request: Request, lang: str | None = None):
-    return _page("about.html", request, lang)
+def about(request: Request):
+    return _serve("about", BASE_LANG, request, negotiate=True)
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots():
+    return PlainTextResponse(f"User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: {SITE}/sitemap.xml\n")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap():
+    urls = []
+    for page in SITE_PAGES:
+        alts = "".join(f'<xhtml:link rel="alternate" hreflang="{l}" href="{SITE}{page_path(page, l)}"/>' for l in LANGS)
+        urls += [f"<url><loc>{SITE}{page_path(page, l)}</loc>{alts}</url>" for l in LANGS]
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+           'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' + "\n".join(urls) + "\n</urlset>\n")
+    return Response(xml, media_type="application/xml")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(Path(__file__).parent / "static" / "favicon-32.png", media_type="image/png")
+
+
+@app.get("/{lang}/")
+def index_lang(lang: str, request: Request):
+    if lang not in DICTS or lang == BASE_LANG:
+        raise HTTPException(404)
+    return _serve("index", lang, request, negotiate=False)
+
+
+@app.get("/{lang}")
+def index_lang_noslash(lang: str):
+    if lang not in DICTS or lang == BASE_LANG:
+        raise HTTPException(404)
+    return RedirectResponse(page_path("index", lang), status_code=301)
+
+
+@app.get("/{lang}/about")
+def about_lang(lang: str, request: Request):
+    if lang not in DICTS or lang == BASE_LANG:
+        raise HTTPException(404)
+    return _serve("about", lang, request, negotiate=False)
