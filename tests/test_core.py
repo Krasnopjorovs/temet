@@ -398,9 +398,11 @@ def test_locales_complete_and_english_titles():
 def test_pages_rendered_per_language():
     """каждая страница на каждом языке: слова подставлены сервером, есть canonical, hreflang и описание"""
     import re
-    from app.main import LANGS, RENDERED, SITE, page_path
+    from app.main import LANGS, RENDERED, SITE, VERSION, page_path
+    assert re.fullmatch(r"\d+\.\d+\.\d+", VERSION)
     for (page, lang), html in RENDERED.items():
         assert f'<html lang="{lang}"' in html
+        assert f"v{VERSION}</a>" in html and "{version}" not in html, (page, lang)   # версия в подвале
         assert not re.search(r'data-i18n="\w+"[^>]*>\s*</', html), (page, lang)       # пустых подписей нет
         assert f'<link rel="canonical" href="{SITE}{page_path(page, lang)}">' in html
         assert html.count('rel="alternate" hreflang=') == len(LANGS) + 1

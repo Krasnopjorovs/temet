@@ -1,5 +1,7 @@
 # Temet nosce
 
+[![CI](https://github.com/Krasnopjorovs/temet/actions/workflows/ci.yml/badge.svg)](https://github.com/Krasnopjorovs/temet/actions/workflows/ci.yml)
+
 *Know thyself.* A birth chart report, a weekly and monthly forecast and a two-person compatibility check, in
 Russian and English. Live at [temet.artjoms.ai](https://temet.artjoms.ai).
 
@@ -58,9 +60,16 @@ Settings in `.env`: `PUBLIC_URL` (the public address used in canonical links and
 (API requests per minute per visitor, default 120), `DRAFTS_NETS` (networks that may see unapproved texts; requests
 through a proxy or tunnel never do), `API_BIND`, `API_PORT`, `ENABLE_NETWORK`.
 
-Tests: `pip install -r requirements-dev.txt && pytest tests/`. Engine checks: `python -m scripts.verify_engine`.
+Checks: `pip install -r requirements-dev.txt`, then `ruff check .`, `pytest tests/` and
+`python -m scripts.verify_engine` (the engine against independent theories and the NASA eclipse catalogue). The same
+three run in GitHub Actions on every push.
 
 More detail (architecture, measurements, scripts) is in Russian in [docs/README.ru.md](docs/README.ru.md).
+
+## Roadmap
+
+The plan is on GitHub: the [Roadmap issue](https://github.com/Krasnopjorovs/temet/issues/1) and the
+[milestones](https://github.com/Krasnopjorovs/temet/milestones). Changes by version are in `CHANGELOG.md`.
 
 ## License
 

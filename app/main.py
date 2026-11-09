@@ -36,6 +36,8 @@ DRAFTS_NETS = [ipaddress.ip_network(n.strip()) for n in
                os.environ.get("DRAFTS_NETS", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8").split(",") if n.strip()]
 # Защита от перебора: не больше RATE_LIMIT запросов к /api в минуту с одного адреса (0 — без ограничения).
 RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "120"))
+# Версия — из файла VERSION в корне: она же тег релиза на GitHub, /healthz, OpenAPI и подвал страниц ({version} в словарях).
+VERSION = (Path(__file__).resolve().parent.parent / "VERSION").read_text(encoding="utf-8").strip()
 
 
 def _require_network():
@@ -58,7 +60,7 @@ async def lifespan(app: FastAPI):
     pool.close()
 
 
-app = FastAPI(title="Temet nosce", version="0.17.0", lifespan=lifespan)
+app = FastAPI(title="Temet nosce", version=VERSION, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 FORWARDED = ("cf-connecting-ip", "x-forwarded-for", "x-real-ip")
 
@@ -161,7 +163,7 @@ def _guard(fn):
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "doctrine": _rt().d.code, "calibrated": sorted(_rt().calibration)}
+    return {"ok": True, "version": VERSION, "doctrine": _rt().d.code, "calibrated": sorted(_rt().calibration)}
 
 
 @app.get("/api/places")
@@ -288,7 +290,9 @@ PAGES = {p.name: _versioned(p.name) for p in (Path(__file__).parent / "static").
 # Слова страниц — app/i18n/<язык>.json. Адреса: основной язык — «/», «/about»; остальные — «/en/», «/en/about».
 # Сервер сам подставляет слова в разметку, заголовок, описание, canonical, hreflang, Open Graph и JSON-LD,
 # поэтому поисковик видит готовую страницу на нужном языке, а скрипты только оживляют её.
-DICTS = {f.stem: json.loads(f.read_text(encoding="utf-8")) for f in sorted((Path(__file__).parent / "i18n").glob("*.json"))}
+DICTS = {f.stem: {k: v.replace("{version}", VERSION) if isinstance(v, str) else v
+                  for k, v in json.loads(f.read_text(encoding="utf-8")).items()}
+         for f in sorted((Path(__file__).parent / "i18n").glob("*.json"))}
 BASE_LANG = i18n.DEFAULT
 LANGS = [BASE_LANG] + [l for l in DICTS if l != BASE_LANG]
 SITE = os.environ.get("PUBLIC_URL", "https://temet.artjoms.ai").rstrip("/")

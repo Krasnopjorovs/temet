@@ -2,7 +2,7 @@
  "hero": "Астрология — язык для самопонимания и разговора, а не научный прогноз.",
  "cta": "Готовы познавать себя?",
  "hero_link": "Как это работает и как всё читать",
- "footer_html": "<a href=\"https://github.com/Krasnopjorovs/temet\">Исходный код</a> (AGPL‑3.0) · расчёты — <a href=\"https://www.astro.com/swisseph/\">Swiss Ephemeris</a> · города — <a href=\"https://www.geonames.org/\">GeoNames</a> (CC BY 4.0) · ничего не сохраняется",
+ "footer_html": "<a href=\"https://github.com/Krasnopjorovs/temet\">Исходный код</a> (AGPL‑3.0), <a href=\"https://github.com/Krasnopjorovs/temet/releases\">v{version}</a> · расчёты — <a href=\"https://www.astro.com/swisseph/\">Swiss Ephemeris</a> · города — <a href=\"https://www.geonames.org/\">GeoNames</a> (CC BY 4.0) · ничего не сохраняется",
  "your_chart": "Ваша карта",
  "calc": "Рассчитать карту",
  "fc_week": "Прогноз на неделю",

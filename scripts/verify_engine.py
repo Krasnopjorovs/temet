@@ -412,7 +412,8 @@ def main():
     verdict("G7 затмения 2026–2028 (каталог NASA)", found == ref,
             f"найдено {len(found)} из {len(ref)}" + (f"; лишние {sorted(found - ref)}, нет {sorted(ref - found)}" if found != ref else ""))
     print("ИТОГ:", "всё сошлось" if ok else "есть расхождения")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

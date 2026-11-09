@@ -2,7 +2,7 @@
  "hero": "Astrology is a language for self-understanding and conversation, not a scientific prediction.",
  "cta": "Ready to know yourself?",
  "hero_link": "How it works and how to read it",
- "footer_html": "<a href=\"https://github.com/Krasnopjorovs/temet\">Source code</a> (AGPL‑3.0) · calculations by <a href=\"https://www.astro.com/swisseph/\">Swiss Ephemeris</a> · places by <a href=\"https://www.geonames.org/\">GeoNames</a> (CC BY 4.0) · nothing is stored",
+ "footer_html": "<a href=\"https://github.com/Krasnopjorovs/temet\">Source code</a> (AGPL‑3.0), <a href=\"https://github.com/Krasnopjorovs/temet/releases\">v{version}</a> · calculations by <a href=\"https://www.astro.com/swisseph/\">Swiss Ephemeris</a> · places by <a href=\"https://www.geonames.org/\">GeoNames</a> (CC BY 4.0) · nothing is stored",
  "your_chart": "Your chart",
  "calc": "Calculate chart",
  "fc_week": "Forecast for the week",
